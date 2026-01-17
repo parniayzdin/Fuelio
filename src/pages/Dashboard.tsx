@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Lightbulb, Save, Car as CarIcon, MapPin, Check, Upload } from "lucide-react";
+import { Calendar as CalendarIcon, Lightbulb, Save, Car as CarIcon, MapPin, Check, Upload, CreditCard as CreditCardIcon, X, RefreshCw, Loader2, Navigation, Fuel } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { DecisionBadge } from "@/components/DecisionBadge";
 import { SeverityBadge } from "@/components/SeverityBadge";
@@ -18,8 +18,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { getRegions, evaluateDecision, createFillup, getTripGuess, getVehicle, updateVehicle, getPriceHistory, getFillups, getTripRecommendation, type TripRecommendation, uploadReceipt } from "@/api/endpoints";
-import type { Region, DecisionResponse, TripGuess, EvaluateRequest, CreateFillupRequest, Alert, Vehicle, PricePoint, Fillup } from "@/types";
+import { getRegions, evaluateDecision, createFillup, getTripGuess, getVehicle, updateVehicle, getPriceHistory, getFillups, getTripRecommendation, type TripRecommendation, uploadReceipt, getCreditCards, getCreditCardProviders, addCreditCard, deleteCreditCard, refreshCardBenefits, getOptimalGasStation, type OptimalStationResponse } from "@/api/endpoints";
+import type { Region, DecisionResponse, TripGuess, EvaluateRequest, CreateFillupRequest, Alert, Vehicle, PricePoint, Fillup, CreditCard } from "@/types";
 
 interface EvaluateFormData {
   region_id: string;
@@ -63,6 +63,19 @@ export function Dashboard() {
   const [tripRecommendation, setTripRecommendation] = useState<TripRecommendation | null>(null);
   const [manualSpending, setManualSpending] = useState<number>(0);
   const [uploadingReceipt, setUploadingReceipt] = useState(false);
+
+  // Credit Card state
+  const [creditCards, setCreditCards] = useState<CreditCard[]>([]);
+  const [creditCardProviders, setCreditCardProviders] = useState<string[]>([]);
+  const [creditCardDialogOpen, setCreditCardDialogOpen] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<string>("");
+  const [addingCard, setAddingCard] = useState(false);
+  const [refreshingCardId, setRefreshingCardId] = useState<string | null>(null);
+
+  // Optimal Gas Station state
+  const [optimalStation, setOptimalStation] = useState<OptimalStationResponse | null>(null);
+  const [loadingOptimalStation, setLoadingOptimalStation] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
 
   const {
     control,
@@ -166,7 +179,96 @@ export function Dashboard() {
   useEffect(() => {
     getFillups().then(setFillups).catch(console.error);
     getTripRecommendation().then(setTripRecommendation).catch(console.error);
+
+    // Load credit cards and providers
+    getCreditCards().then(setCreditCards).catch(console.error);
+    getCreditCardProviders().then(setCreditCardProviders).catch(console.error);
+
+    // Get user location for optimal gas station
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          // Default to Toronto if geolocation fails
+          setUserLocation({ lat: 43.65, lng: -79.38 });
+        }
+      );
+    }
   }, []);
+
+  // Fetch optimal station when location and vehicle are available
+  const fetchOptimalStation = async () => {
+    if (!userLocation) return;
+
+    setLoadingOptimalStation(true);
+    try {
+      const tankSize = vehicle?.tank_size_liters || 50;
+      const efficiency = vehicle?.efficiency_l_per_100km || 8;
+      const result = await getOptimalGasStation(
+        userLocation.lat,
+        userLocation.lng,
+        tankSize,
+        efficiency,
+        20,  // Default fuel percent - we don't need the form value
+        10000
+      );
+      setOptimalStation(result);
+    } catch (error) {
+      console.error("Failed to fetch optimal station:", error);
+    } finally {
+      setLoadingOptimalStation(false);
+    }
+  };
+
+  // Auto-fetch when location becomes available
+  useEffect(() => {
+    if (userLocation) {
+      fetchOptimalStation();
+    }
+  }, [userLocation, vehicle]);
+
+  const onAddCreditCard = async () => {
+    if (!selectedProvider) return;
+
+    setAddingCard(true);
+    try {
+      const newCard = await addCreditCard(selectedProvider);
+      setCreditCards(prev => [...prev, newCard]);
+      setCreditCardDialogOpen(false);
+      setSelectedProvider("");
+    } catch (error) {
+      console.error("Failed to add credit card:", error);
+    } finally {
+      setAddingCard(false);
+    }
+  };
+
+  const onDeleteCreditCard = async (id: string) => {
+    try {
+      await deleteCreditCard(id);
+      setCreditCards(prev => prev.filter(c => c.id !== id));
+    } catch (error) {
+      console.error("Failed to delete credit card:", error);
+    }
+  };
+
+  const onRefreshCardBenefits = async (id: string) => {
+    setRefreshingCardId(id);
+    try {
+      const updated = await refreshCardBenefits(id);
+      setCreditCards(prev => prev.map(c => c.id === id ? updated : c));
+    } catch (error) {
+      console.error("Failed to refresh benefits:", error);
+    } finally {
+      setRefreshingCardId(null);
+    }
+  };
 
   const onSaveVehicle = async (data: VehicleFormData) => {
     setIsSavingVehicle(true);
@@ -511,6 +613,326 @@ export function Dashboard() {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Credit Card Benefits Section */}
+        <Card className="border-2 border-primary/10">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-full">
+                  <CreditCardIcon className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Credit Card Gas Benefits</CardTitle>
+                  <CardDescription>Maximize your fuel savings with credit card rewards</CardDescription>
+                </div>
+              </div>
+
+              <Dialog open={creditCardDialogOpen} onOpenChange={setCreditCardDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <CreditCardIcon className="h-4 w-4 mr-2" />
+                    Add Card
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Credit Card</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Enter Your Credit Card Name</Label>
+                      <Input
+                        list="credit-card-suggestions"
+                        value={selectedProvider}
+                        onChange={(e) => setSelectedProvider(e.target.value)}
+                        placeholder="Type or select a credit card..."
+                        className="w-full"
+                      />
+                      <datalist id="credit-card-suggestions">
+                        {creditCardProviders.map((provider) => (
+                          <option key={provider} value={provider} />
+                        ))}
+                      </datalist>
+                      <p className="text-xs text-muted-foreground">
+                        Type your card name or choose from suggestions
+                      </p>
+                    </div>
+                    <Button
+                      onClick={onAddCreditCard}
+                      disabled={!selectedProvider.trim() || addingCard}
+                      className="w-full"
+                    >
+                      {addingCard ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Searching Benefits...
+                        </>
+                      ) : (
+                        "Add Card & Search Benefits"
+                      )}
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      We'll search the web using Google AI to find the latest gas and fuel benefits for your card.
+                    </p>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {creditCards.length === 0 ? (
+              <div className="text-center py-8">
+                <CreditCardIcon className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
+                <h3 className="text-lg font-medium text-foreground mb-2">No Credit Cards Added</h3>
+                <p className="text-muted-foreground mb-4">
+                  Add your credit cards to see their gas and fuel rewards benefits.
+                </p>
+                <Button onClick={() => setCreditCardDialogOpen(true)} variant="outline">
+                  <CreditCardIcon className="h-4 w-4 mr-2" />
+                  Add Your First Card
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {creditCards.map((card) => (
+                  <div key={card.id} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <CreditCardIcon className="h-4 w-4 text-primary" />
+                        {card.provider}
+                      </h4>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => onRefreshCardBenefits(card.id)}
+                          disabled={refreshingCardId === card.id}
+                        >
+                          {refreshingCardId === card.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          onClick={() => onDeleteCreditCard(card.id)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {card.benefits ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        {card.benefits.gas_cashback_percent && (
+                          <div className="bg-green-50 dark:bg-green-950/20 p-3 rounded">
+                            <div className="text-xs text-muted-foreground">Gas Cashback</div>
+                            <div className="font-semibold text-green-700 dark:text-green-400">
+                              {card.benefits.gas_cashback_percent}% back
+                            </div>
+                          </div>
+                        )}
+                        {card.benefits.gas_cashback_cap && (
+                          <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded">
+                            <div className="text-xs text-muted-foreground">Annual Cap</div>
+                            <div className="font-semibold text-blue-700 dark:text-blue-400">
+                              ${card.benefits.gas_cashback_cap.toFixed(2)}
+                            </div>
+                          </div>
+                        )}
+                        {card.benefits.partner_stations && card.benefits.partner_stations.length > 0 && (
+                          <div className="bg-purple-50 dark:bg-purple-950/20 p-3 rounded md:col-span-2">
+                            <div className="text-xs text-muted-foreground mb-1">Partner Stations</div>
+                            <div className="font-medium text-purple-700 dark:text-purple-400">
+                              {card.benefits.partner_stations.join(", ")}
+                            </div>
+                          </div>
+                        )}
+                        {card.benefits.special_promotions && card.benefits.special_promotions.length > 0 && (
+                          <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded md:col-span-2">
+                            <div className="text-xs text-muted-foreground mb-1">Special Promotions</div>
+                            <ul className="text-sm space-y-1">
+                              {card.benefits.special_promotions.map((promo, i) => (
+                                <li key={i} className="text-yellow-800 dark:text-yellow-400">• {promo}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {card.benefits.notes && (
+                          <div className="text-xs text-muted-foreground md:col-span-2 italic">
+                            {card.benefits.notes}
+                          </div>
+                        )}
+                        {/* Show message if no benefits found */}
+                        {!card.benefits.gas_cashback_percent &&
+                          !card.benefits.gas_cashback_cap &&
+                          !card.benefits.partner_stations?.length &&
+                          !card.benefits.special_promotions?.length && (
+                            <div className="md:col-span-2 text-sm text-muted-foreground italic">
+                              {card.benefits.notes || "No specific gas/fuel benefits found for this card."}
+                            </div>
+                          )}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        Loading benefits...
+                      </div>
+                    )}
+
+                    <div className="text-xs text-muted-foreground">
+                      Last updated: {new Date(card.last_updated).toLocaleDateString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Optimal Gas Station Recommendation */}
+        <Card className="border-2 border-green-500/20">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-500/10 rounded-full">
+                  <Navigation className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Best Gas Station For You</CardTitle>
+                  <CardDescription>Optimized for price, distance, and fuel cost to drive there</CardDescription>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchOptimalStation}
+                disabled={loadingOptimalStation || !userLocation}
+              >
+                {loadingOptimalStation ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loadingOptimalStation ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-3">Finding best stations...</span>
+              </div>
+            ) : optimalStation ? (
+              <div className="space-y-4">
+                {/* Best Station */}
+                <div className="bg-green-50 dark:bg-green-950/20 border-2 border-green-500/30 rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="bg-green-500 text-white text-xs font-bold px-2 py-0.5 rounded">#1 BEST</span>
+                        <span className="text-lg font-semibold">{optimalStation.optimal.station.name}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{optimalStation.optimal.station.address}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-green-600">
+                        ${optimalStation.optimal.station.regular?.toFixed(3)}/L
+                      </div>
+                      {optimalStation.optimal.savings_vs_average > 0 && (
+                        <div className="text-sm text-green-600">
+                          Save ${optimalStation.optimal.savings_vs_average.toFixed(2)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3 mt-4 text-sm">
+                    <div className="bg-white dark:bg-gray-800 p-2 rounded text-center">
+                      <div className="text-xs text-muted-foreground">Distance</div>
+                      <div className="font-semibold">{optimalStation.optimal.distance_km.toFixed(1)} km</div>
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 p-2 rounded text-center">
+                      <div className="text-xs text-muted-foreground">Drive Cost</div>
+                      <div className="font-semibold">${optimalStation.optimal.fuel_cost_to_drive.toFixed(2)}</div>
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 p-2 rounded text-center">
+                      <div className="text-xs text-muted-foreground">Total Fill</div>
+                      <div className="font-semibold">${optimalStation.optimal.total_cost_for_tank.toFixed(2)}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 text-sm italic text-green-700 dark:text-green-400">
+                    💡 {optimalStation.optimal.reasoning}
+                  </div>
+                </div>
+
+                {/* Analysis Summary */}
+                <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded">
+                  {optimalStation.analysis_summary}
+                </div>
+
+                {/* Your Cards Being Used */}
+                {optimalStation.your_cards_used && optimalStation.your_cards_used.length > 0 && (
+                  <div className="flex items-center gap-2 text-sm bg-primary/10 p-2 rounded">
+                    <CreditCardIcon className="h-4 w-4 text-primary" />
+                    <span>Using your cards:</span>
+                    <span className="font-medium">{optimalStation.your_cards_used.join(", ")}</span>
+                  </div>
+                )}
+
+                {/* Credit Card Recommendations */}
+                {optimalStation.card_recommendations && optimalStation.card_recommendations.length > 0 && (
+                  <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <h4 className="text-sm font-semibold text-blue-700 dark:text-blue-400 mb-3 flex items-center gap-2">
+                      <CreditCardIcon className="h-4 w-4" />
+                      Get These Cards to Save More!
+                    </h4>
+                    <div className="space-y-2">
+                      {optimalStation.card_recommendations.map((rec) => (
+                        <div key={rec.card_name} className="bg-white dark:bg-gray-800 rounded p-3 flex justify-between items-center">
+                          <div>
+                            <div className="font-medium">{rec.card_name}</div>
+                            <div className="text-xs text-muted-foreground">{rec.why_recommended}</div>
+                          </div>
+                          <div className="text-lg font-bold text-blue-600">+${rec.potential_savings_per_fill.toFixed(2)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Alternatives */}
+                {optimalStation.alternatives.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-muted-foreground">Other Options:</h4>
+                    {optimalStation.alternatives.slice(0, 3).map((alt) => (
+                      <div key={alt.station.id} className="flex items-center justify-between border rounded p-3 text-sm">
+                        <div>
+                          <span className="font-medium">#{alt.rank} {alt.station.name}</span>
+                          <span className="text-muted-foreground ml-2">({alt.distance_km.toFixed(1)} km)</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-semibold">${alt.station.regular?.toFixed(3)}/L</div>
+                          <div className="text-xs text-muted-foreground">Total: ${alt.total_cost_for_tank.toFixed(2)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Navigation className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                <p>Enable location access to find the best gas station near you</p>
               </div>
             )}
           </CardContent>

@@ -361,3 +361,270 @@ async def get_nearby_gas_stations(
             status_code=500,
             detail=f"Error fetching gas stations: {str(e)}"
         )
+
+
+class StationRecommendation(BaseModel):
+    """A recommended gas station with credit card optimization."""
+    station: GasStation
+    distance_km: float
+    fuel_cost_to_drive: float
+    base_price_per_liter: float
+    effective_price_per_liter: float  # After cashback
+    total_cost_for_tank: float
+    savings_vs_average: float
+    rank: int
+    reasoning: str
+    best_card_to_use: Optional[str] = None
+    card_savings: float = 0
+
+
+class CardRecommendation(BaseModel):
+    """Credit card recommendation for better gas savings."""
+    card_name: str
+    potential_savings_per_fill: float
+    best_station_with_card: str
+    effective_price_with_card: float
+    why_recommended: str
+
+
+class OptimalStationResponse(BaseModel):
+    """Response with optimal station and card recommendations."""
+    optimal: StationRecommendation
+    alternatives: list[StationRecommendation]
+    analysis_summary: str
+    card_recommendations: list[CardRecommendation]
+    your_cards_used: list[str]
+
+
+def haversine_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Calculate distance between two points in kilometers using Haversine formula."""
+    import math
+    R = 6371  # Earth's radius in km
+    
+    lat1_rad = math.radians(lat1)
+    lat2_rad = math.radians(lat2)
+    delta_lat = math.radians(lat2 - lat1)
+    delta_lng = math.radians(lng2 - lng1)
+    
+    a = math.sin(delta_lat/2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lng/2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    
+    return R * c
+
+
+@router.get("/optimal", response_model=OptimalStationResponse)
+async def get_optimal_gas_station(
+    lat: float = Query(..., description="Your current latitude"),
+    lng: float = Query(..., description="Your current longitude"),
+    tank_size_liters: float = Query(50.0, description="Vehicle tank size in liters"),
+    efficiency_l_per_100km: float = Query(8.0, description="Vehicle fuel efficiency (L/100km)"),
+    current_fuel_percent: float = Query(20.0, description="Current fuel level as percentage (0-100)"),
+    radius: int = Query(10000, description="Search radius in meters", ge=1000, le=50000),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Find the optimal gas station considering:
+    1. Distance from your location
+    2. Fuel price at the station
+    3. Your saved CREDIT CARD cashback benefits
+    4. Recommends which card to use at each station
+    5. Suggests new cards that would unlock even better deals
+    """
+    from ..models import CreditCard as CreditCardModel
+    import json
+    
+    # Get all credit cards in the DB (simplified - gets all cards)
+    user_cards = []
+    user_card_names = []
+    try:
+        result = await db.execute(select(CreditCardModel))
+        all_cards = result.scalars().all()
+        # For now, just use all cards in the DB (in production, filter by user)
+        user_cards = all_cards
+        user_card_names = [c.provider for c in user_cards]
+    except Exception as e:
+        print(f"Could not get user cards: {e}")
+    
+    # Parse card benefits
+    def parse_benefits(card):
+        if not card.benefits_json:
+            return {"gas_cashback_percent": 0, "partner_stations": []}
+        try:
+            return json.loads(card.benefits_json)
+        except:
+            return {"gas_cashback_percent": 0, "partner_stations": []}
+    
+    card_benefits = []
+    for card in user_cards:
+        benefits = parse_benefits(card)
+        card_benefits.append({
+            "provider": card.provider,
+            "cashback": benefits.get("gas_cashback_percent") or 0,
+            "partners": benefits.get("partner_stations") or []
+        })
+    
+    # Get nearby stations
+    nearby_stations_result = await get_nearby_gas_stations(lat, lng, radius, db)
+    
+    if not nearby_stations_result:
+        raise HTTPException(status_code=404, detail="No gas stations found")
+    
+    # Calculate liters to fill
+    current_liters = tank_size_liters * (current_fuel_percent / 100.0)
+    liters_to_fill = tank_size_liters - current_liters
+    
+    # Known good gas cards for recommendations
+    RECOMMENDED_CARDS = [
+        {"name": "Citi Custom Cash Card", "cashback": 5.0, "notes": "5% on top spending category"},
+        {"name": "Sam's Club Mastercard", "cashback": 5.0, "notes": "5% on gas (first $6k/yr)"},
+        {"name": "Costco Anywhere Visa", "cashback": 4.0, "notes": "4% on gas (first $7k/yr)"},
+        {"name": "PNC Cash Rewards Visa", "cashback": 4.0, "notes": "4% on gas"},
+        {"name": "Blue Cash Preferred Amex", "cashback": 3.0, "notes": "3% at US gas stations"},
+    ]
+    
+    # Analyze each station with credit card benefits
+    station_analyses = []
+    
+    for station in nearby_stations_result:
+        if station.regular is None:
+            continue
+        
+        base_price = station.regular
+        distance_km = haversine_distance(lat, lng, station.lat, station.lng)
+        fuel_to_drive = (distance_km * efficiency_l_per_100km) / 100.0
+        
+        # Find best card for this station
+        best_card = None
+        best_cashback = 0
+        
+        for card in card_benefits:
+            cashback = card["cashback"] or 0
+            if cashback > best_cashback:
+                best_cashback = cashback
+                best_card = card["provider"]
+        
+        # Calculate effective price after cashback
+        cashback_discount = base_price * (best_cashback / 100.0)
+        effective_price = base_price - cashback_discount
+        
+        # Costs
+        fuel_cost_to_drive = fuel_to_drive * effective_price
+        fill_cost = liters_to_fill * effective_price
+        total_cost = fill_cost + fuel_cost_to_drive
+        card_savings = liters_to_fill * cashback_discount
+        
+        station_analyses.append({
+            "station": station,
+            "distance_km": round(distance_km, 2),
+            "fuel_to_drive": round(fuel_to_drive, 3),
+            "fuel_cost_to_drive": round(fuel_cost_to_drive, 2),
+            "base_price": base_price,
+            "effective_price": round(effective_price, 4),
+            "total_cost": round(total_cost, 2),
+            "best_card": best_card,
+            "best_cashback": best_cashback,
+            "card_savings": round(card_savings, 2),
+        })
+    
+    if not station_analyses:
+        raise HTTPException(status_code=404, detail="No stations with price data")
+    
+    # Sort by total cost (after cashback!)
+    station_analyses.sort(key=lambda x: x["total_cost"])
+    
+    # Calculate averages
+    avg_total_cost = sum(s["total_cost"] for s in station_analyses) / len(station_analyses)
+    
+    # Create recommendations
+    recommendations = []
+    
+    for i, analysis in enumerate(station_analyses[:5]):
+        savings_vs_avg = avg_total_cost - analysis["total_cost"]
+        
+        reasons = []
+        if analysis["best_card"]:
+            reasons.append(f"Use {analysis['best_card']} for {analysis['best_cashback']}% back")
+            if analysis["card_savings"] > 0:
+                reasons.append(f"Card saves ${analysis['card_savings']:.2f}")
+        
+        if analysis["distance_km"] <= 2:
+            reasons.append(f"Only {analysis['distance_km']:.1f} km away")
+        if savings_vs_avg > 2:
+            reasons.append(f"Save ${savings_vs_avg:.2f} vs avg")
+        
+        reasoning = " | ".join(reasons) if reasons else "Good balance of price and distance"
+        
+        recommendations.append(StationRecommendation(
+            station=analysis["station"],
+            distance_km=analysis["distance_km"],
+            fuel_cost_to_drive=analysis["fuel_cost_to_drive"],
+            base_price_per_liter=analysis["base_price"],
+            effective_price_per_liter=analysis["effective_price"],
+            total_cost_for_tank=analysis["total_cost"],
+            savings_vs_average=round(savings_vs_avg, 2),
+            rank=i + 1,
+            reasoning=reasoning,
+            best_card_to_use=analysis["best_card"],
+            card_savings=analysis["card_savings"]
+        ))
+    
+    # Generate card recommendations
+    card_recommendations = []
+    user_card_lower = [n.lower() for n in user_card_names]
+    
+    for rec_card in RECOMMENDED_CARDS:
+        if any(rec_card["name"].lower() in uc for uc in user_card_lower):
+            continue  # Skip if user has this card
+        
+        # Calculate potential savings with this card
+        best_total = float('inf')
+        best_station_name = ""
+        best_eff_price = 0
+        
+        for analysis in station_analyses[:10]:
+            hypo_discount = analysis["base_price"] * (rec_card["cashback"] / 100.0)
+            hypo_effective = analysis["base_price"] - hypo_discount
+            hypo_total = liters_to_fill * hypo_effective + analysis["fuel_to_drive"] * hypo_effective
+            
+            if hypo_total < best_total:
+                best_total = hypo_total
+                best_station_name = analysis["station"].name
+                best_eff_price = hypo_effective
+        
+        current_best = recommendations[0].total_cost_for_tank if recommendations else float('inf')
+        potential_savings = current_best - best_total
+        
+        if potential_savings > 0.5:  # Recommend if saves at least $0.50
+            card_recommendations.append(CardRecommendation(
+                card_name=rec_card["name"],
+                potential_savings_per_fill=round(potential_savings, 2),
+                best_station_with_card=best_station_name,
+                effective_price_with_card=round(best_eff_price, 4),
+                why_recommended=f"{rec_card['cashback']}% gas cashback - {rec_card['notes']}"
+            ))
+    
+    card_recommendations.sort(key=lambda x: x.potential_savings_per_fill, reverse=True)
+    
+    # Create summary
+    optimal = recommendations[0]
+    summary_parts = [f"Analyzed {len(station_analyses)} stations."]
+    
+    if optimal.best_card_to_use:
+        summary_parts.append(f"Best: {optimal.station.name} at ${optimal.effective_price_per_liter:.3f}/L (with {optimal.best_card_to_use}).")
+    else:
+        summary_parts.append(f"Best: {optimal.station.name} at ${optimal.base_price_per_liter:.3f}/L.")
+    
+    if optimal.card_savings > 0:
+        summary_parts.append(f"Your card saves ${optimal.card_savings:.2f}!")
+    
+    if card_recommendations:
+        top_rec = card_recommendations[0]
+        summary_parts.append(f"💡 Get {top_rec.card_name} to save ${top_rec.potential_savings_per_fill:.2f} more per fill!")
+    
+    return OptimalStationResponse(
+        optimal=optimal,
+        alternatives=recommendations[1:],
+        analysis_summary=" ".join(summary_parts),
+        card_recommendations=card_recommendations[:3],
+        your_cards_used=user_card_names
+    )

@@ -14,7 +14,10 @@ import type {
   Alert,
   PriceForecast,
   PricePoint,
+  CreditCard,
+  CreateCreditCardRequest,
 } from "@/types";
+
 
 // Auth endpoints
 export async function signup(email: string, password: string, lat?: number, lng?: number): Promise<AuthResponse> {
@@ -249,5 +252,71 @@ export async function getGasStations(
 ): Promise<GasStationResponse[]> {
   return apiGet<GasStationResponse[]>(
     `/gas-stations/nearby?lat=${lat}&lng=${lng}&radius=${radius}`
+  );
+}
+
+// Credit Card endpoints
+export async function getCreditCardProviders(): Promise<string[]> {
+  return apiGet<string[]>("/credit-cards/providers");
+}
+
+export async function getCreditCards(): Promise<CreditCard[]> {
+  return apiGet<CreditCard[]>("/credit-cards");
+}
+
+export async function addCreditCard(provider: string): Promise<CreditCard> {
+  const request: CreateCreditCardRequest = { provider };
+  return apiPost<CreditCard>("/credit-cards", request);
+}
+
+export async function deleteCreditCard(id: string): Promise<void> {
+  return apiDelete<void>(`/credit-cards/${id}`);
+}
+
+export async function refreshCardBenefits(id: string): Promise<CreditCard> {
+  return apiPost<CreditCard>(`/credit-cards/${id}/refresh`, {});
+}
+
+// Optimal Gas Station endpoints
+export interface StationRecommendation {
+  station: GasStationResponse;
+  distance_km: number;
+  fuel_cost_to_drive: number;
+  base_price_per_liter: number;
+  effective_price_per_liter: number;  // After cashback
+  total_cost_for_tank: number;
+  savings_vs_average: number;
+  rank: number;
+  reasoning: string;
+  best_card_to_use?: string;
+  card_savings: number;
+}
+
+export interface CardRecommendation {
+  card_name: string;
+  potential_savings_per_fill: number;
+  best_station_with_card: string;
+  effective_price_with_card: number;
+  why_recommended: string;
+}
+
+export interface OptimalStationResponse {
+  optimal: StationRecommendation;
+  alternatives: StationRecommendation[];
+  analysis_summary: string;
+  card_recommendations: CardRecommendation[];
+  your_cards_used: string[];
+}
+
+export async function getOptimalGasStation(
+  lat: number,
+  lng: number,
+  tankSizeLiters: number = 50,
+  efficiencyLPer100km: number = 8,
+  currentFuelPercent: number = 20,
+  radius: number = 10000
+): Promise<OptimalStationResponse> {
+  return apiGet<OptimalStationResponse>(
+    `/gas-stations/optimal?lat=${lat}&lng=${lng}&tank_size_liters=${tankSizeLiters}&efficiency_l_per_100km=${efficiencyLPer100km}&current_fuel_percent=${currentFuelPercent}&radius=${radius}`
   );
 }

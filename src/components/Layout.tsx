@@ -1,10 +1,13 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Fuel, LayoutDashboard, MapPin, Map, Bell, Settings, LogOut, TrendingUp, Moon, Sun } from "lucide-react";
+import { Fuel, LayoutDashboard, MapPin, Map, Bell, Settings, LogOut, TrendingUp, Moon, Sun, User as UserIcon } from "lucide-react";
 import { clearToken } from "@/api/client";
 import { cn } from "@/lib/utils";
 import { AdBanner } from "@/components/promotions";
 import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
+import { getMe } from "@/api/endpoints";
+import { useState, useEffect } from "react";
+import type { User } from "@/types";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -22,6 +25,11 @@ const navItems = [
 export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    getMe().then(setUser).catch(console.error);
+  }, []);
 
   const handleLogout = () => {
     clearToken();
@@ -55,6 +63,14 @@ export function Layout({ children }: LayoutProps) {
                 {item.label}
               </NavLink>
             ))}
+
+            {/* User Email Display */}
+            {user && (
+              <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+                <UserIcon className="h-4 w-4" />
+                <span className="hidden lg:inline">{user.email}</span>
+              </div>
+            )}
 
             {/* Theme Toggle */}
 

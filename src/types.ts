@@ -138,3 +138,24 @@ export interface Alert {
   explanation: string;
   status: "new" | "acknowledged" | "read";
 }
+
+// Credit Card types
+export interface CreditCardBenefits {
+  gas_cashback_percent?: number | null;
+  gas_cashback_cap?: number | null;
+  special_promotions?: string[] | null;
+  partner_stations?: string[] | null;
+  notes?: string | null;
+}
+
+export interface CreditCard {
+  id: string;
+  provider: string;
+  benefits: CreditCardBenefits | null;
+  last_updated: string;
+  created_at: string;
+}
+
+export interface CreateCreditCardRequest {
+  provider: string;
+}
