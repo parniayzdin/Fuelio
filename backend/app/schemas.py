@@ -150,3 +150,24 @@ class AlertResponse(BaseModel):
     severity: Literal["low", "medium", "high"]
     explanation: str
     status: Literal["new", "acknowledged"]
+
+
+# Credit Card schemas
+class CreditCardBenefits(BaseModel):
+    gas_cashback_percent: Optional[float] = None
+    gas_cashback_cap: Optional[float] = None
+    special_promotions: Optional[list[str]] = None
+    partner_stations: Optional[list[str]] = None
+    notes: Optional[str] = None
+
+
+class CreditCardCreate(BaseModel):
+    provider: str
+
+
+class CreditCardResponse(BaseModel):
+    id: str
+    provider: str
+    benefits: Optional[CreditCardBenefits] = None
+    last_updated: datetime
+    created_at: datetime
