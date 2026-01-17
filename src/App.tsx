@@ -11,8 +11,7 @@ import { Dashboard } from "@/pages/Dashboard";
 import { GasMap } from "@/pages/GasMap";
 import { Prices } from "@/pages/Prices";
 import { Trips } from "@/pages/Trips";
-import { Alerts } from "@/pages/Alerts";
-import { Settings } from "@/pages/Settings";
+// Temporarily disable Alerts and Settings
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -67,22 +66,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/alerts"
-              element={
-                <ProtectedRoute>
-                  <Alerts />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              }
-            />
+            {/* Alerts and Settings routes removed for now */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
