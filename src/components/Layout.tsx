@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Fuel, LayoutDashboard, MapPin, Map, Bell, Settings, LogOut, TrendingUp, Moon, Sun, User as UserIcon } from "lucide-react";
+import { Fuel, LayoutDashboard, MapPin, Map, LogOut, TrendingUp, User as UserIcon } from "lucide-react";
 import { clearToken } from "@/api/client";
 import { cn } from "@/lib/utils";
 import { AdBanner } from "@/components/promotions";
@@ -18,8 +18,7 @@ const navItems = [
   { to: "/map", label: "Gas Map", icon: Map },
   { to: "/prices", label: "Price Forecast", icon: TrendingUp },
   { to: "/trips", label: "Trips", icon: MapPin },
-  { to: "/alerts", label: "Alerts", icon: Bell },
-  { to: "/settings", label: "Settings", icon: Settings },
+  // Alerts and Settings temporarily removed
 ];
 
 export function Layout({ children }: LayoutProps) {

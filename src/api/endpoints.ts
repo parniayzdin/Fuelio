@@ -320,3 +320,63 @@ export async function getOptimalGasStation(
     `/gas-stations/optimal?lat=${lat}&lng=${lng}&tank_size_liters=${tankSizeLiters}&efficiency_l_per_100km=${efficiencyLPer100km}&current_fuel_percent=${currentFuelPercent}&radius=${radius}`
   );
 }
+
+// Fuel Strategy Optimization (Pyomo/CPLEX)
+export interface TripPoint {
+  lat: number;
+  lng: number;
+}
+
+export interface FuelStrategyRequest {
+  trip_path: TripPoint[];
+  departure_date?: string;
+  tank_size_liters: number;
+  efficiency_l_per_100km: number;
+  current_fuel_percent: number;
+  search_radius_km: number;
+}
+
+export interface StationInfo {
+  id: string;
+  name: string;
+  brand: string;
+  address: string;
+  lat: number;
+  lng: number;
+}
+
+export interface FillUpStop {
+  station: StationInfo;
+  day_offset: number;
+  day_name: string;
+  liters_to_fill: number;
+  effective_price: number;
+  base_price: number;
+  card_to_use?: string;
+  km_at_stop: number;
+  savings_from_card: number;
+  savings_from_timing: number;
+}
+
+export interface FuelProjectionPoint {
+  km: number;
+  fuel_pct: number;
+  action?: string;
+}
+
+export interface FuelStrategyResponse {
+  stops: FillUpStop[];
+  total_cost: number;
+  total_savings: number;
+  reasoning: string[];
+  fuel_projection: FuelProjectionPoint[];
+  solver_status: string;
+  stations_analyzed: number;
+  trip_distance_km: number;
+}
+
+export async function optimizeFuelStrategy(
+  request: FuelStrategyRequest
+): Promise<FuelStrategyResponse> {
+  return apiPost<FuelStrategyResponse>("/fuel-strategy/optimize", request);
+}

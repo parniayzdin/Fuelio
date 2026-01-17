@@ -16,6 +16,7 @@ from .routes.gas_stations import router as gas_stations_router
 from .routes.trip_recommendation import router as trip_recommendation_router
 from .routes.receipt_upload import router as receipt_router
 from .routes.credit_cards import router as credit_cards_router
+from .routes.fuel_strategy import router as fuel_strategy_router
 
 
 @asynccontextmanager
@@ -56,6 +57,7 @@ app.include_router(gas_stations_router)
 app.include_router(trip_recommendation_router)
 app.include_router(receipt_router)
 app.include_router(credit_cards_router)
+app.include_router(fuel_strategy_router)
 
 
 @app.get("/health")
