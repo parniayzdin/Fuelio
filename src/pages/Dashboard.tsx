@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+
 import { cn } from "@/lib/utils";
 import { getRegions, evaluateDecision, createFillup, getTripGuess, getVehicle, updateVehicle, getPriceHistory, getFillups, getTripRecommendation, type TripRecommendation, uploadReceipt, getCreditCards, getCreditCardProviders, addCreditCard, deleteCreditCard, refreshCardBenefits, getOptimalGasStation, type OptimalStationResponse } from "@/api/endpoints";
 import type { Region, DecisionResponse, TripGuess, EvaluateRequest, CreateFillupRequest, Alert, Vehicle, PricePoint, Fillup, CreditCard } from "@/types";
@@ -49,6 +50,12 @@ interface VehicleFormData {
 }
 
 export function Dashboard() {
+  // Persisted fuel percent across navigation
+  const savedFuelPercent = (() => {
+    const v = typeof window !== 'undefined' ? window.localStorage.getItem('fuel_percent') : null;
+    const n = v !== null ? Number(v) : NaN;
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 50;
+  })();
   const [regions, setRegions] = useState<Region[]>([]);
   const [decision, setDecision] = useState<DecisionResponse | null>(null);
   const [tripGuess, setTripGuess] = useState<TripGuess | null>(null);
@@ -86,7 +93,7 @@ export function Dashboard() {
     defaultValues: {
       region_id: "",
       fuel_anchor_type: "percent",
-      fuel_percent: 50,
+      fuel_percent: savedFuelPercent,
       last_fillup_date: undefined,
       planned_trip_km: "",
       use_predicted_trip: false,
@@ -126,6 +133,14 @@ export function Dashboard() {
   const watchedRegion = watch("region_id");
   const watchedUsePredicted = watch("use_predicted_trip");
   const watchedFuelAnchorType = watch("fuel_anchor_type");
+  const watchedFuelPercent = watch("fuel_percent");
+
+  // Persist fuel percent so it doesn't reset on navigation
+  useEffect(() => {
+    if (typeof window !== 'undefined' && typeof watchedFuelPercent === 'number') {
+      window.localStorage.setItem('fuel_percent', String(watchedFuelPercent));
+    }
+  }, [watchedFuelPercent]);
   const watchedFullTank = watchFillup("full_tank");
 
   useEffect(() => {
@@ -178,7 +193,19 @@ export function Dashboard() {
 
   useEffect(() => {
     getFillups().then(setFillups).catch(console.error);
-    getTripRecommendation().then(setTripRecommendation).catch(console.error);
+    getTripRecommendation()
+      .then(setTripRecommendation)
+      .catch(err => {
+        console.error("Failed to load trip recommendations:", err);
+        // Fallback to NO_TRIPS so user can use manual planner
+        setTripRecommendation({
+          recommendation: 'NO_TRIPS',
+          reasoning: 'Could not load upcoming trips.',
+          estimated_savings: 0,
+          confidence: 'N/A',
+          next_trip_details: null
+        });
+      });
 
     // Load credit cards and providers
     getCreditCards().then(setCreditCards).catch(console.error);
@@ -215,7 +242,7 @@ export function Dashboard() {
         userLocation.lng,
         tankSize,
         efficiency,
-        20,  // Default fuel percent - we don't need the form value
+        (watchedFuelPercent ?? 50),
         10000
       );
       setOptimalStation(result);
@@ -231,7 +258,7 @@ export function Dashboard() {
     if (userLocation) {
       fetchOptimalStation();
     }
-  }, [userLocation, vehicle]);
+  }, [userLocation, vehicle, watchedFuelPercent]);
 
   const onAddCreditCard = async () => {
     if (!selectedProvider) return;
@@ -557,10 +584,80 @@ export function Dashboard() {
                 Analyzing optimization models...
               </div>
             ) : tripRecommendation.recommendation === 'NO_TRIPS' ? (
-              <div className="py-8 text-center">
-                <MapPin className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
-                <h3 className="text-lg font-medium text-foreground">No Upcoming Trips</h3>
-                <p className="text-muted-foreground">Plan a trip on the Gas Map to activate AI recommendations.</p>
+              <div className="space-y-4">
+                <div className="text-sm text-muted-foreground bg-purple-50 dark:bg-purple-950/20 p-4 rounded-lg">
+                  <p className="font-semibold text-purple-700 dark:text-purple-400 flex items-center gap-2">
+                    🧠 Pyomo Mathematical Optimization
+                  </p>
+                  <p className="text-xs mt-1">Uses operations research to find when & where to fill up based on:</p>
+                  <ul className="text-xs mt-2 grid grid-cols-2 gap-1">
+                    <li>• Gas stations along route (20km)</li>
+                    <li>• 7-day price forecasts</li>
+                    <li>• Your credit card cashback</li>
+                    <li>• Vehicle consumption model</li>
+                  </ul>
+                </div>
+
+                <div className="bg-muted/30 p-4 rounded-lg space-y-3">
+                  <p className="text-sm font-medium">Try a Demo Trip: Toronto → London, ON</p>
+                  <div className="space-y-4 pt-4">
+                {/* Range Remaining slider removed; uses top control */}
+                  </div>
+
+                  <Button
+                    className="w-full mt-4"
+                    onClick={async () => {
+                      try {
+                        const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+                        const res = await fetch(`${API_BASE}/fuel-strategy/optimize`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            trip_path: [
+                              { lat: 43.65, lng: -79.38 },
+                              { lat: 43.26, lng: -79.87 },
+                              { lat: 42.98, lng: -81.23 }
+                            ],
+                            tank_size_liters: vehicle?.tank_size_liters || 50,
+                            efficiency_l_per_100km: vehicle?.efficiency_l_per_100km || 8,
+                            current_fuel_percent: (watch("fuel_percent") ?? 50),
+                            search_radius_km: 20
+                          })
+                        });
+                        const data = await res.json();
+
+                        // Check for solver error since we enforce strict CPLEX now
+                        if (data.solver_status && data.solver_status.startsWith('error')) {
+                          alert(`Optimization Error: ${data.solver_status}\n\n${data.reasoning?.join('\n')}`);
+                          return;
+                        }
+
+                        setTripRecommendation({
+                          recommendation: 'OPTIMIZED', // Custom state for demo result
+                          reasoning: data.reasoning?.join('\n') || 'Optimized route calculated.',
+                          estimated_savings: data.total_savings || 0,
+                          confidence: 'HIGH',
+                          next_trip_details: {
+                            distance_km: data.stops?.length ? data.stops.reduce((acc: number, s: any) => acc + (s.km_at_stop || 0), 0) : 180, // Approx for demo
+                            start_time: new Date().toISOString(),
+                            hours_until: 0
+                          },
+                          optimization_status: data.solver_status
+                        });
+                      } catch (e) {
+                        console.error('Optimization error:', e);
+                        alert('Optimization failed - make sure server is running');
+                      }
+                    }}
+                  >
+                    <Fuel className="h-4 w-4 mr-2" />
+                    Run AI Fuel Optimization
+                  </Button>
+                </div>
+
+                <p className="text-xs text-center text-muted-foreground">
+                  Or plan a trip on the Gas Map for personalized recommendations
+                </p>
               </div>
             ) : tripRecommendation.recommendation === 'NO_VEHICLE' ? (
               <div className="py-8 text-center">
@@ -937,6 +1034,7 @@ export function Dashboard() {
             )}
           </CardContent>
         </Card>
+
 
         {/* Bottom Row: Management */}
         <div className="grid gap-6 md:grid-cols-2">
