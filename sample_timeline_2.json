@@ -1,0 +1,40 @@
+{
+    "timelineObjects": [
+        {
+            "activitySegment": {
+                "startLocation": {
+                    "latitudeE7": 436532000,
+                    "longitudeE7": -793832000
+                },
+                "endLocation": {
+                    "latitudeE7": 435890000,
+                    "longitudeE7": -796441000
+                },
+                "duration": {
+                    "startTimestamp": "2026-02-01T09:00:00Z",
+                    "endTimestamp": "2026-02-01T09:45:00Z"
+                },
+                "distance": 28500,
+                "activityType": "IN_PASSENGER_VEHICLE"
+            }
+        },
+        {
+            "activitySegment": {
+                "startLocation": {
+                    "latitudeE7": 435890000,
+                    "longitudeE7": -796441000
+                },
+                "endLocation": {
+                    "latitudeE7": 436532000,
+                    "longitudeE7": -793832000
+                },
+                "duration": {
+                    "startTimestamp": "2026-02-01T17:00:00Z",
+                    "endTimestamp": "2026-02-01T17:50:00Z"
+                },
+                "distance": 29100,
+                "activityType": "DRIVING"
+            }
+        }
+    ]
+}
