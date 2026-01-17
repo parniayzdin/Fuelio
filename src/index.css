@@ -1,0 +1,126 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light Mode Variables */
+    --background: 0 0% 100%;
+    --foreground: 224 71.4% 4.1%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 224 71.4% 4.1%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 71.4% 4.1%;
+
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 220 14.3% 95.9%;
+    --secondary-foreground: 220.9 39.3% 11%;
+
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 220 8.9% 46.1%;
+
+    --accent: 220 14.3% 95.9%;
+    --accent-foreground: 220.9 39.3% 11%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 222.2 47.4% 11.2%;
+
+    --radius: 0.75rem;
+
+    /* Chart / Decision Colors */
+    --chart-historical: 142 76% 36%;
+    --chart-forecast: 217 91% 60%;
+    --chart-grid: 220 13% 91%;
+
+    --decision-fill: 142 76% 36%;
+    --decision-fill-foreground: 0 0% 100%;
+    --decision-no-action: 45 93% 47%;
+    --decision-no-action-foreground: 0 0% 0%;
+
+    --severity-low: 142 76% 90%;
+    --severity-low-foreground: 142 76% 26%;
+    --severity-medium: 45 93% 90%;
+    --severity-medium-foreground: 45 93% 30%;
+    --severity-high: 0 84% 90%;
+    --severity-high-foreground: 0 84% 40%;
+  }
+
+  .dark {
+    /* Pink & Dark Theme (User Preferred) */
+    --background: 224 7% 12%;
+    --foreground: 0 0% 98%;
+
+    --card: 224 7% 13%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 224 7% 13%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 350 100% 80%;
+    --primary-foreground: 240 5.9% 10%;
+
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 350 100% 80%;
+
+    /* Chart / Decision Colors */
+    --chart-historical: 142 70% 50%;
+    --chart-forecast: 350 100% 80%;
+    --chart-grid: 240 3.7% 15.9%;
+
+    --decision-fill: 142 70% 45%;
+    --decision-fill-foreground: 0 0% 100%;
+    --decision-no-action: 45 93% 47%;
+    --decision-no-action-foreground: 0 0% 0%;
+
+    --severity-low: 142 50% 20%;
+    --severity-low-foreground: 142 70% 70%;
+    --severity-medium: 45 70% 20%;
+    --severity-medium-foreground: 45 90% 70%;
+    --severity-high: 0 60% 25%;
+    --severity-high-foreground: 0 80% 70%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(at 0% 0%, hsla(350, 80%, 15%, 0.4) 0, transparent 50%),
+      /* Pink splash top left */
+      radial-gradient(at 100% 0%, hsla(25, 90%, 15%, 0.4) 0, transparent 50%),
+      /* Orange splash top right */
+      linear-gradient(to bottom, transparent, hsla(224, 7%, 12%, 1));
+    /* Fade to solid dark */
+    background-attachment: fixed;
+    background-size: cover;
+    background-repeat: no-repeat;
+  }
+}
