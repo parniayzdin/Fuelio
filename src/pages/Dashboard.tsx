@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
-import { format } from "date-fns";
-import { Calendar as CalendarIcon, Lightbulb, Save, Car as CarIcon, MapPin, Check, Upload, CreditCard as CreditCardIcon, X, RefreshCw, Loader2, Navigation, Fuel } from "lucide-react";
+import { startOfWeek, endOfWeek, addWeeks } from "date-fns";
+import { Lightbulb, Car as CarIcon, CreditCard as CreditCardIcon, X, RefreshCw, Loader2, Navigation, Fuel } from "lucide-react";
 import { Layout } from "@/components/Layout";
 import { DecisionBadge } from "@/components/DecisionBadge";
 import { SeverityBadge } from "@/components/SeverityBadge";
@@ -13,14 +13,12 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+ 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 import { cn } from "@/lib/utils";
-import { getRegions, evaluateDecision, createFillup, getTripGuess, getVehicle, updateVehicle, getPriceHistory, getFillups, getTripRecommendation, type TripRecommendation, uploadReceipt, getCreditCards, getCreditCardProviders, addCreditCard, deleteCreditCard, refreshCardBenefits, getOptimalGasStation, type OptimalStationResponse } from "@/api/endpoints";
-import type { Region, DecisionResponse, TripGuess, EvaluateRequest, CreateFillupRequest, Alert, Vehicle, PricePoint, Fillup, CreditCard } from "@/types";
+import { getRegions, evaluateDecision, getTripGuess, getVehicle, updateVehicle, getTripRecommendation, type TripRecommendation, getCreditCards, getCreditCardProviders, addCreditCard, deleteCreditCard, refreshCardBenefits, getOptimalGasStation, type OptimalStationResponse, getTrips } from "@/api/endpoints";
+import type { Region, DecisionResponse, TripGuess, EvaluateRequest, Alert, Vehicle, PricePoint, CreditCard, Trip } from "@/types";
 
 interface EvaluateFormData {
   region_id: string;
@@ -60,16 +58,16 @@ export function Dashboard() {
   const [decision, setDecision] = useState<DecisionResponse | null>(null);
   const [tripGuess, setTripGuess] = useState<TripGuess | null>(null);
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
-  const [todayPrice, setTodayPrice] = useState<number | null>(null);
+  
   const [isEvaluating, setIsEvaluating] = useState(false);
-  const [isSavingFillup, setIsSavingFillup] = useState(false);
   const [isSavingVehicle, setIsSavingVehicle] = useState(false);
-  const [fillupDialogOpen, setFillupDialogOpen] = useState(false);
   const [vehicleDialogOpen, setVehicleDialogOpen] = useState(false);
-  const [fillups, setFillups] = useState<Fillup[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [thisWeekKm, setThisWeekKm] = useState<number>(0);
+  const [nextWeekKm, setNextWeekKm] = useState<number>(0);
+  const [predictedNextWeekLiters, setPredictedNextWeekLiters] = useState<number>(0);
   const [tripRecommendation, setTripRecommendation] = useState<TripRecommendation | null>(null);
-  const [manualSpending, setManualSpending] = useState<number>(0);
-  const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  
 
   // Credit Card state
   const [creditCards, setCreditCards] = useState<CreditCard[]>([]);
@@ -101,21 +99,6 @@ export function Dashboard() {
   });
 
   const {
-    control: fillupControl,
-    handleSubmit: handleFillupSubmit,
-    reset: resetFillup,
-    watch: watchFillup,
-  } = useForm<FillupFormData>({
-    defaultValues: {
-      date: new Date(),
-      time: format(new Date(), "HH:mm"),
-      full_tank: true,
-      fuel_percent: "",
-      liters: "",
-    },
-  });
-
-  const {
     control: vehicleControl,
     handleSubmit: handleVehicleSubmit,
     reset: resetVehicle,
@@ -141,8 +124,6 @@ export function Dashboard() {
       window.localStorage.setItem('fuel_percent', String(watchedFuelPercent));
     }
   }, [watchedFuelPercent]);
-  const watchedFullTank = watchFillup("full_tank");
-
   useEffect(() => {
     getRegions()
       .then((data) => {
@@ -173,26 +154,10 @@ export function Dashboard() {
     }).catch(console.error);
   }, [setVehicleFormValue]);
 
-  useEffect(() => {
-    if (watchedRegion) {
-      getPriceHistory(watchedRegion, 1).then(prices => {
-        if (prices.length > 0) {
-          // Find today's price or most recent
-          const todayStr = format(new Date(), 'yyyy-MM-dd');
-          const today = prices.find(p => p.date === todayStr);
-          if (today) {
-            setTodayPrice(today.price);
-          } else {
-            // fallback to latest
-            setTodayPrice(prices[prices.length - 1].price);
-          }
-        }
-      }).catch(console.error);
-    }
-  }, [watchedRegion]);
+  
 
   useEffect(() => {
-    getFillups().then(setFillups).catch(console.error);
+    getTrips().then(setTrips).catch(console.error);
     getTripRecommendation()
       .then(setTripRecommendation)
       .catch(err => {
@@ -228,6 +193,34 @@ export function Dashboard() {
       );
     }
   }, []);
+
+  // Compute weekly trip metrics and predicted consumption
+  useEffect(() => {
+    const now = new Date();
+    const sow = startOfWeek(now, { weekStartsOn: 1 });
+    const eow = endOfWeek(now, { weekStartsOn: 1 });
+    const nextSow = addWeeks(sow, 1);
+    const nextEow = endOfWeek(nextSow, { weekStartsOn: 1 });
+    const lastSow = addWeeks(sow, -1);
+    const lastEow = endOfWeek(lastSow, { weekStartsOn: 1 });
+
+    const inRange = (d: Date, start: Date, end: Date) => d >= start && d <= end;
+
+    const thisWeek = trips.filter(t => inRange(new Date(t.start_time), sow, now));
+    const nextWeek = trips.filter(t => inRange(new Date(t.start_time), nextSow, nextEow));
+    const lastWeek = trips.filter(t => inRange(new Date(t.start_time), lastSow, lastEow));
+
+    const sumKm = (list: Trip[]) => list.reduce((acc, t) => acc + (t.distance_km || 0), 0);
+    const thisKm = sumKm(thisWeek);
+    const nextKm = sumKm(nextWeek);
+    const lastKm = sumKm(lastWeek);
+
+    setThisWeekKm(thisKm);
+    setNextWeekKm(nextKm);
+
+    const eff = vehicle?.efficiency_l_per_100km || 8;
+    setPredictedNextWeekLiters((lastKm * eff) / 100);
+  }, [trips, vehicle]);
 
   // Fetch optimal station when location and vehicle are available
   const fetchOptimalStation = async () => {
@@ -371,80 +364,132 @@ export function Dashboard() {
     }
   };
 
-  const onSaveFillup = async (data: FillupFormData) => {
-    setIsSavingFillup(true);
-    try {
-      const [hours, minutes] = data.time.split(":").map(Number);
-      const timestamp = new Date(data.date);
-      timestamp.setHours(hours, minutes, 0, 0);
+  
 
-      const request: CreateFillupRequest = {
-        timestamp: timestamp.toISOString(),
-        full_tank: data.full_tank,
-        fuel_percent: data.full_tank ? undefined : parseFloat(data.fuel_percent),
-        liters: parseFloat(data.liters),
-      };
+  
 
-      await createFillup(request);
-      setFillupDialogOpen(false);
-      resetFillup();
-    } catch (error) {
-      console.error("Failed to save fillup:", error);
-    } finally {
-      setIsSavingFillup(false);
-    }
-  };
-
-  // Calculate monthly spending from fillups (add to manual)
-  const calculatedSpending = fillups
-    .filter(f => {
-      const fillupDate = new Date(f.time);
-      const now = new Date();
-      return fillupDate.getMonth() === now.getMonth() &&
-        fillupDate.getFullYear() === now.getFullYear();
-    })
-    .reduce((sum, f) => {
-      const liters = f.liters_optional || 0;
-      const pricePerLiter = todayPrice || 0;
-      return sum + (liters * pricePerLiter);
-    }, 0);
-
-  const totalSpending = calculatedSpending + manualSpending;
-
-  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadingReceipt(true);
-    try {
-      const result = await uploadReceipt(file);
-      if (result.fillup_created) {
-        // Refresh fillups
-        getFillups().then(setFillups).catch(console.error);
-      }
-      if (result.extracted_data.total_amount) {
-        setManualSpending(prev => prev + result.extracted_data.total_amount!);
-      }
-    } catch (error) {
-      console.error('Failed to upload receipt:', error);
-    } finally {
-      setUploadingReceipt(false);
-    }
-  };
-
-  // Calculate range remaining
-  const rangeRemaining = vehicle && watchedFuelAnchorType === 'percent'
-    ? ((vehicle.tank_size_liters * (watch("fuel_percent") / 100)) / vehicle.efficiency_l_per_100km) * 100
+  // Calculate range remaining (exclude reserve fuel)
+  const reserveFraction = vehicle?.reserve_fraction ?? 0.1;
+  const fuelPercentVal = watchedFuelPercent;
+  const rangeRemaining = (
+    vehicle && watchedFuelAnchorType === 'percent' &&
+    typeof fuelPercentVal === 'number' &&
+    vehicle.efficiency_l_per_100km > 0
+  )
+    ? ((vehicle.tank_size_liters * Math.max(0, (fuelPercentVal / 100) - reserveFraction)) / vehicle.efficiency_l_per_100km) * 100
     : null;
 
   return (
     <Layout>
       <div className="space-y-8">
 
-        {/* Top Row: KPI HUD */}
-        <div className="grid gap-4 md:grid-cols-3">
+        {/* Top Row: Vehicle + Range */}
+        <div className="grid gap-4 md:grid-cols-2">
 
-          {/* Card 1: Range Remaining */}
+          {/* Card 1: Vehicle Configuration */}
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CarIcon className="h-4 w-4" />
+                  Vehicle Configuration
+                </CardTitle>
+                <Dialog open={vehicleDialogOpen} onOpenChange={setVehicleDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8">Edit</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Edit Vehicle Details</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleVehicleSubmit(onSaveVehicle)} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Make</Label>
+                        <Controller name="make" control={vehicleControl} render={({ field }) => <Input placeholder="e.g. Jeep" {...field} />} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Model</Label>
+                        <Controller name="model" control={vehicleControl} render={({ field }) => <Input placeholder="e.g. Cherokee" {...field} />} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Year</Label>
+                        <Controller name="year" control={vehicleControl} render={({ field }) => <Input type="number" placeholder="e.g. 2023" {...field} />} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Fuel Efficiency (L/100km)</Label>
+                        <Controller
+                          name="efficiency_l_per_100km"
+                          control={vehicleControl}
+                          render={({ field }) => (
+                            <Input
+                              type="number"
+                              step="0.1"
+                              placeholder="e.g. 9.5 (Leave blank to auto-detect)"
+                              {...field}
+                            />
+                          )}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Fuel Type</Label>
+                        <Controller
+                          name="fuel_type"
+                          control={vehicleControl}
+                          render={({ field }) => (
+                            <Select value={field.value} onValueChange={field.onChange}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select fuel type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="regular">Regular (87)</SelectItem>
+                                <SelectItem value="premium">Premium (91+)</SelectItem>
+                                <SelectItem value="diesel">Diesel</SelectItem>
+                                <SelectItem value="electric">Electric</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </div>
+                      <Button type="submit" disabled={isSavingVehicle} className="w-full">
+                        {isSavingVehicle ? "Saving..." : "Save Vehicle"}
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {vehicle?.make ? (
+                <div className="space-y-4">
+                  {vehicle.image_url && (
+                    <div className="relative aspect-video w-full overflow-hidden rounded-md">
+                      <img src={vehicle.image_url} alt="Vehicle" className="object-cover w-full h-full" />
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">{vehicle.year} {vehicle.make} {vehicle.model}</span>
+                    <span className="font-semibold">{vehicle.efficiency_l_per_100km} L/100km</span>
+                  </div>
+                  {/* Max range (usable, excluding reserve) */}
+                  {vehicle?.efficiency_l_per_100km && vehicle.efficiency_l_per_100km > 0 && (
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Max range (usable): </span>
+                      <span className="font-semibold">
+                        {Math.round(((vehicle.tank_size_liters * (1 - (vehicle.reserve_fraction ?? 0.1))) / vehicle.efficiency_l_per_100km) * 100)} km
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <p>No vehicle configured</p>
+                  <Button variant="link" onClick={() => setVehicleDialogOpen(true)}>Add Vehicle</Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Card 2: Range Remaining */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Range Remaining</CardTitle>
@@ -456,7 +501,7 @@ export function Dashboard() {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Fuel Level</span>
-                  <span className="font-medium">{watch("fuel_percent")}%</span>
+                  <span className="font-medium">{watchedFuelPercent}%</span>
                 </div>
                 <Controller
                   name="fuel_percent"
@@ -470,86 +515,30 @@ export function Dashboard() {
                     />
                   )}
                 />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Card 2: Monthly Spending */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Fuel Spending (Month)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-start mb-4">
-                <div className="text-3xl font-bold">
-                  ${totalSpending.toFixed(2)}
-                </div>
-                <div className="flex gap-1">
-                  {/* Upload Button */}
-                  <Input
-                    id="receipt-upload"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleReceiptUpload}
-                    disabled={uploadingReceipt}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => document.getElementById('receipt-upload')?.click()}
-                    disabled={uploadingReceipt}
-                  >
-                    {uploadingReceipt ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Manual Adjustment ($)</Label>
-                <Input
-                  type="number"
-                  value={manualSpending}
-                  onChange={(e) => setManualSpending(parseFloat(e.target.value) || 0)}
-                  className="h-8"
-                  step="0.01"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Card 3: Market Pulse (Combined Decision + Price) */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Market Pulse</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold mb-2">
-                {todayPrice ? `$${todayPrice.toFixed(3)}` : 'Loading...'} <span className="text-sm font-normal text-muted-foreground">/L</span>
-              </div>
-              {decision ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className={cn(
-                      "text-xs px-2 py-1 rounded font-medium",
-                      decision.price_change_percent > 0 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
-                    )}>
-                      {decision.price_change_percent > 0 ? "Rising" : "Falling"}
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      Forecast: ${decision.predicted_price.toFixed(3)}
-                    </span>
+                {vehicle && (
+                  <div className="text-xs text-muted-foreground">
+                    Based on your vehicle: tank {vehicle.tank_size_liters}L • eff {vehicle.efficiency_l_per_100km} L/100km • reserve {(reserveFraction * 100).toFixed(0)}%
                   </div>
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {decision.explanation}
-                  </p>
+                )}
+                <div className="grid grid-cols-3 gap-3 pt-2">
+                  <div className="bg-muted/30 p-2 rounded">
+                    <div className="text-xs text-muted-foreground">Driven this week</div>
+                    <div className="font-semibold">{Math.round(thisWeekKm)} km</div>
+                  </div>
+                  <div className="bg-muted/30 p-2 rounded">
+                    <div className="text-xs text-muted-foreground">Planned next week</div>
+                    <div className="font-semibold">{Math.round(nextWeekKm)} km</div>
+                  </div>
+                  <div className="bg-muted/30 p-2 rounded">
+                    <div className="text-xs text-muted-foreground">Predicted consumption</div>
+                    <div className="font-semibold">{predictedNextWeekLiters.toFixed(1)} L</div>
+                  </div>
                 </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">Analyzing market trends...</p>
-              )}
+              </div>
             </CardContent>
           </Card>
+
+          
         </div>
 
         {/* Middle Row: AI Strategy Hero */}
@@ -1036,219 +1025,7 @@ export function Dashboard() {
         </Card>
 
 
-        {/* Bottom Row: Management */}
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* My Vehicle */}
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <CarIcon className="h-4 w-4" />
-                  Vehicle Configuration
-                </CardTitle>
-                <Dialog open={vehicleDialogOpen} onOpenChange={setVehicleDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8">Edit</Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Edit Vehicle Details</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleVehicleSubmit(onSaveVehicle)} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Make</Label>
-                        <Controller name="make" control={vehicleControl} render={({ field }) => <Input placeholder="e.g. Jeep" {...field} />} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Model</Label>
-                        <Controller name="model" control={vehicleControl} render={({ field }) => <Input placeholder="e.g. Cherokee" {...field} />} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Year</Label>
-                        <Controller name="year" control={vehicleControl} render={({ field }) => <Input type="number" placeholder="e.g. 2023" {...field} />} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Fuel Efficiency (L/100km)</Label>
-                        <Controller
-                          name="efficiency_l_per_100km"
-                          control={vehicleControl}
-                          render={({ field }) => (
-                            <Input
-                              type="number"
-                              step="0.1"
-                              placeholder="e.g. 9.5 (Leave blank to auto-detect)"
-                              {...field}
-                            />
-                          )}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Fuel Type</Label>
-                        <Controller
-                          name="fuel_type"
-                          control={vehicleControl}
-                          render={({ field }) => (
-                            <Select value={field.value} onValueChange={field.onChange}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select fuel type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="regular">Regular (87)</SelectItem>
-                                <SelectItem value="premium">Premium (91+)</SelectItem>
-                                <SelectItem value="diesel">Diesel</SelectItem>
-                                <SelectItem value="electric">Electric</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          )}
-                        />
-                      </div>
-                      <Button type="submit" disabled={isSavingVehicle} className="w-full">
-                        {isSavingVehicle ? "Saving..." : "Save Vehicle"}
-                      </Button>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {vehicle?.make ? (
-                <div className="space-y-4">
-                  {vehicle.image_url && (
-                    <div className="relative aspect-video w-full overflow-hidden rounded-md">
-                      <img src={vehicle.image_url} alt="Vehicle" className="object-cover w-full h-full" />
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">{vehicle.year} {vehicle.make} {vehicle.model}</span>
-                    <span className="font-semibold">{vehicle.efficiency_l_per_100km} L/100km</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-6 text-muted-foreground">
-                  <p>No vehicle configured</p>
-                  <Button variant="link" onClick={() => setVehicleDialogOpen(true)}>Add Vehicle</Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Quick Fillup Log */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Save className="h-4 w-4" />
-                Quick Actions
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Dialog open={fillupDialogOpen} onOpenChange={setFillupDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="w-full py-6 text-base" variant="secondary">
-                    <Save className="mr-2 h-5 w-5" />
-                    Log Manual Fill-up
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Record Fill-up</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleFillupSubmit(onSaveFillup)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Date</Label>
-                        <Controller
-                          name="date"
-                          control={fillupControl}
-                          render={({ field }) => (
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button variant="outline" className="w-full justify-start">
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {format(field.value, "MMM d")}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                  mode="single"
-                                  selected={field.value}
-                                  onSelect={(date) => date && field.onChange(date)}
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-                          )}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Time</Label>
-                        <Controller
-                          name="time"
-                          control={fillupControl}
-                          render={({ field }) => (
-                            <Input type="time" {...field} />
-                          )}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Controller
-                        name="full_tank"
-                        control={fillupControl}
-                        render={({ field }) => (
-                          <Switch checked={field.value} onCheckedChange={field.onChange} />
-                        )}
-                      />
-                      <Label>Full tank</Label>
-                    </div>
-
-                    {!watchedFullTank && (
-                      <div className="space-y-2">
-                        <Label>Fuel Percentage After</Label>
-                        <Controller
-                          name="fuel_percent"
-                          control={fillupControl}
-                          render={({ field }) => (
-                            <Input type="number" placeholder="e.g. 75" {...field} />
-                          )}
-                        />
-                      </div>
-                    )}
-
-                    <div className="space-y-2">
-                      <Label>Liters</Label>
-                      <Controller
-                        name="liters"
-                        control={fillupControl}
-                        render={({ field }) => (
-                          <Input type="number" step="0.1" placeholder="e.g. 45.5" {...field} />
-                        )}
-                      />
-                    </div>
-
-                    <Button type="submit" className="w-full" disabled={isSavingFillup}>
-                      {isSavingFillup ? "Saving..." : "Save Fill-up"}
-                    </Button>
-                  </form>
-                </DialogContent>
-              </Dialog>
-
-              <div className="text-center pt-2">
-                <p className="text-xs text-muted-foreground mb-2">Recent Activity</p>
-                <div className="text-sm font-medium">
-                  {fillups.length > 0 ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Check className="h-3 w-3 text-green-500" />
-                      Last fill-up: {format(new Date(fillups[0].time), "MMM d")} ({fillups[0].liters_optional}L)
-                    </span>
-                  ) : (
-                    "No history recorded"
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        
 
         {/* Ad Banner */}
         <div className="mt-6 flex justify-center">

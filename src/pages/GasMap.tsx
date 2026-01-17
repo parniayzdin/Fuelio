@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Locate, Fuel, RefreshCw, AlertCircle, TrendingUp, MapPin, Plus, X, Check, Trash2 } from "lucide-react";
 import { StationForecastModal } from "@/components/StationForecastModal";
 import { AdBanner } from "@/components/promotions";
-import { getGasStations, type GasStationResponse, createTrip, deleteAllTrips } from "@/api/endpoints";
+import { getGasStations, type GasStationResponse, createTrip, deleteAllTrips, createFillup } from "@/api/endpoints";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -79,6 +79,17 @@ function GasMapWithKey() {
     const [isRecurring, setIsRecurring] = useState(false);
     const [recurrenceFrequency, setRecurrenceFrequency] = useState<string>("daily");
     const [directionsResult, setDirectionsResult] = useState<google.maps.DirectionsResult | null>(null);
+    // Fill-up dialog state
+    const [showFillupDialog, setShowFillupDialog] = useState(false);
+    const [fillupFullTank, setFillupFullTank] = useState(true);
+    const [fillupLiters, setFillupLiters] = useState("");
+    const [fillupPercentAfter, setFillupPercentAfter] = useState("");
+    const [fillupSaving, setFillupSaving] = useState(false);
+    const [fillupWhen, setFillupWhen] = useState<string>(() => {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        return now.toISOString().slice(0,16);
+    });
     const [drivingDistanceKm, setDrivingDistanceKm] = useState<number>(0);
 
     const onMapLoad = useCallback((map: google.maps.Map) => {
@@ -611,6 +622,13 @@ function GasMapWithKey() {
                                         <TrendingUp className="h-3 w-3" />
                                         View Price Forecast
                                     </button>
+                                    <button
+                                        onClick={() => setShowFillupDialog(true)}
+                                        className="mt-2 w-full flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 transition-colors"
+                                    >
+                                        <Fuel className="h-3 w-3" />
+                                        Record Fill-up Here
+                                    </button>
                                 </div>
                             </InfoWindow>
                         )}
@@ -713,6 +731,72 @@ function GasMapWithKey() {
                         station={forecastStation}
                         onClose={() => setForecastStation(null)}
                     />
+                )}
+
+                {/* Record Fill-up Dialog */}
+                {showFillupDialog && (
+                    <Dialog open={showFillupDialog} onOpenChange={setShowFillupDialog}>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Record Fill-up</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="text-sm text-muted-foreground">Date & Time</label>
+                                    <Input type="datetime-local" value={fillupWhen} onChange={(e) => setFillupWhen(e.target.value)} />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Switch checked={fillupFullTank} onCheckedChange={setFillupFullTank} />
+                                    <span>Full tank</span>
+                                </div>
+                                {!fillupFullTank && (
+                                    <div>
+                                        <label className="text-sm text-muted-foreground">Fuel % After</label>
+                                        <Input type="number" placeholder="e.g. 75" value={fillupPercentAfter} onChange={(e) => setFillupPercentAfter(e.target.value)} />
+                                    </div>
+                                )}
+                                <div>
+                                    <label className="text-sm text-muted-foreground">Liters</label>
+                                    <Input type="number" step="0.1" placeholder="e.g. 45.5" value={fillupLiters} onChange={(e) => setFillupLiters(e.target.value)} />
+                                </div>
+                                <div className="flex gap-2 pt-2">
+                                    <Button variant="outline" className="flex-1" onClick={() => setShowFillupDialog(false)}>Cancel</Button>
+                                    <Button
+                                        className="flex-1"
+                                        disabled={fillupSaving}
+                                        onClick={async () => {
+                                            try {
+                                                setFillupSaving(true);
+                                                const iso = new Date(fillupWhen).toISOString();
+                                                await createFillup({
+                                                    time: iso,
+                                                    full_tank_bool: fillupFullTank,
+                                                    fuel_percent_optional: fillupFullTank ? undefined : (fillupPercentAfter ? parseFloat(fillupPercentAfter) : undefined),
+                                                    liters_optional: fillupLiters ? parseFloat(fillupLiters) : undefined,
+                                                });
+                                                // Update dashboard fuel slider via localStorage
+                                                if (fillupFullTank) {
+                                                    localStorage.setItem('fuel_percent', '100');
+                                                } else if (fillupPercentAfter) {
+                                                    const pct = Math.max(0, Math.min(100, Number(fillupPercentAfter)));
+                                                    if (!Number.isNaN(pct)) localStorage.setItem('fuel_percent', String(pct));
+                                                }
+                                                setShowFillupDialog(false);
+                                                setFillupLiters("");
+                                                setFillupPercentAfter("");
+                                            } catch (e) {
+                                                console.error('Failed to record fill-up:', e);
+                                            } finally {
+                                                setFillupSaving(false);
+                                            }
+                                        }}
+                                    >
+                                        {fillupSaving ? 'Saving...' : 'Save Fill-up'}
+                                    </Button>
+                                </div>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
                 )}
 
                 {/* Sponsored Content */}
