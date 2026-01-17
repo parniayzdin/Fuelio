@@ -24,6 +24,8 @@ class User(Base):
     trips: Mapped[list["Trip"]] = relationship(back_populates="user")
     fillups: Mapped[list["Fillup"]] = relationship(back_populates="user")
     alerts: Mapped[list["Alert"]] = relationship(back_populates="user")
+    credit_cards: Mapped[list["CreditCard"]] = relationship(back_populates="user")
+
 
 
 class Vehicle(Base):
@@ -141,4 +143,16 @@ class GasStation(Base):
     rating: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     user_ratings_total: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
+
+class CreditCard(Base):
+    __tablename__ = "credit_cards"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True)
+    provider: Mapped[str] = mapped_column(String(100), nullable=False)
+    benefits_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    last_updated: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped["User"] = relationship(back_populates="credit_cards")
 
