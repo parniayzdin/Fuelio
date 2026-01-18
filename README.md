@@ -1,5 +1,5 @@
 # Fuelio
-Smart fuel decisions based on price trends and your driving patterns.
+Fuelio helps drivers make smarter fill-up decisions by combining live gas prices with price trend forecasting and your driving patterns. It shows nearby stations on a map, estimates trip fuel costs for your vehicle, and gives clear recommendations on whether to fill up now or wait.
 
 ## Inspiration
 With fuel prices fluctuating wildly and the cost of living increasing, we realized that drivers needed smarter tools than just "current price" apps. We built this advisor to use data and AI to help people time their fill-ups perfectly and save money on every tank.
