@@ -16,7 +16,7 @@ Fuelio is a smart application designed to help drivers optimize their fuel spend
 *   **Uvicorn**: ASGI server implementation.
 *   **PyFuelPrices**: Custom library integration for real-time fuel data.
 <p>
-  <img width="511" height="398" alt="image" src="https://github.com/user-attachments/assets/cfd4fe7d-f97b-4473-a06e-44be04b7b916" />
+<video src="" controls></video>
 </p>
 
 ## Installation
