@@ -10,6 +10,11 @@ node_modules
 dist
 dist-ssr
 *.local
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
 
 .vscode/*
 !.vscode/extensions.json
@@ -26,7 +31,10 @@ venv/
 *-service-account*.json
 fuel-up-advisor-*.json
 *-key.json
+<<<<<<< HEAD
 
+=======
+>>>>>>> a7061d6 (Ignore Python cache files)
 backend/fuelup.db
 
 __pycache__/
