@@ -112,7 +112,6 @@ def find_stations_along_route(
     for station in all_stations:
         slat, slng = station['lat'], station['lng']
         
-        # Check distance to each route segment
         min_dist = float('inf')
         closest_km = 0
         cumulative_km = 0
@@ -125,9 +124,7 @@ def find_stations_along_route(
             
             if seg_dist < min_dist:
                 min_dist = seg_dist
-                # Approximate km position along route
                 segment_len = haversine_km(p1.lat, p1.lng, p2.lat, p2.lng)
-                # Simple: place at midpoint of segment for now
                 closest_km = cumulative_km + segment_len / 2
             
             cumulative_km += haversine_km(p1.lat, p1.lng, p2.lat, p2.lng)
@@ -144,7 +141,6 @@ def find_stations_along_route(
                 base_prices={0: station.get('regular', 1.50)}
             ))
     
-    # Sort by position along route
     found_stations.sort(key=lambda s: s.km_along_route)
     return found_stations
 
@@ -190,18 +186,15 @@ def build_optimization_model(
     """
     model = ConcreteModel("FuelStrategy")
     
-    # Calculate total trip distance
     total_km = sum(
         haversine_km(route_points[i].lat, route_points[i].lng,
                      route_points[i+1].lat, route_points[i+1].lng)
         for i in range(len(route_points) - 1)
     )
     
-    # Calculate total fuel needed
     total_fuel_needed = (total_km * efficiency_l_per_100km) / 100.0
     initial_fuel = tank_size_liters * (initial_fuel_pct / 100.0)
     
-    # Sets
     num_stations = len(stations)
     num_days = forecast_days
     
@@ -211,19 +204,14 @@ def build_optimization_model(
     model.STATIONS = range(num_stations)
     model.DAYS = range(num_days)
     
-    # Decision Variables
-    # x[s,d] = 1 if we fill at station s on day d
     model.x = Var(model.STATIONS, model.DAYS, domain=Binary)
-    # liters[s,d] = liters purchased at station s on day d
     model.liters = Var(model.STATIONS, model.DAYS, domain=NonNegativeReals, bounds=(0, tank_size_liters))
     
-    # Precompute effective prices
     eff_prices = {}
     for s in model.STATIONS:
         for d in model.DAYS:
             eff_prices[(s,d)] = stations[s].effective_price(d)
     
-    # Objective: Minimize total fuel cost
     def obj_rule(m):
         return sum(
             eff_prices[(s,d)] * m.liters[s,d]
@@ -231,31 +219,25 @@ def build_optimization_model(
         )
     model.objective = Objective(rule=obj_rule, sense=minimize)
     
-    # Constraint: Total fuel purchased must be enough to complete trip
     def fuel_sufficiency_rule(m):
         total_purchased = sum(m.liters[s,d] for s in m.STATIONS for d in m.DAYS)
         fuel_deficit = max(0, total_fuel_needed - initial_fuel + reserve_liters)
         return total_purchased >= fuel_deficit
     model.fuel_sufficiency = Constraint(rule=fuel_sufficiency_rule)
     
-    # Constraint: Can't purchase more than tank capacity allows at any point
-    # (Simplified: total purchased + initial <= tank_size)
     def tank_capacity_rule(m):
         total_purchased = sum(m.liters[s,d] for s in m.STATIONS for d in m.DAYS)
         return total_purchased + initial_fuel <= tank_size_liters + total_fuel_needed
     model.tank_capacity = Constraint(rule=tank_capacity_rule)
     
-    # Constraint: Link binary x to liters (if x=0, liters must be 0)
     def link_rule(m, s, d):
         return m.liters[s,d] <= tank_size_liters * m.x[s,d]
     model.link = Constraint(model.STATIONS, model.DAYS, rule=link_rule)
     
-    # Constraint: At most one fill per station (across all days)
     def one_fill_per_station_rule(m, s):
         return sum(m.x[s,d] for d in m.DAYS) <= 1
     model.one_fill_per_station = Constraint(model.STATIONS, rule=one_fill_per_station_rule)
     
-    # Constraint: At most 2 total fills (practical limit)
     def max_fills_rule(m):
         return sum(m.x[s,d] for s in m.STATIONS for d in m.DAYS) <= 2
     model.max_fills = Constraint(rule=max_fills_rule)
@@ -284,7 +266,6 @@ def solve_greedy_heuristic(metadata: dict) -> OptimizationResult:
     fuel_needed = metadata['total_fuel_needed']
     efficiency = metadata['efficiency']
     
-    # Check if we can reach destination without stopping
     if initial_fuel >= fuel_needed:
         return OptimizationResult(
             stops=[],
@@ -295,8 +276,6 @@ def solve_greedy_heuristic(metadata: dict) -> OptimizationResult:
             solver_status="heuristic_no_stop"
         )
 
-    # Sort stations by effective price (cheapest first)
-    # Filter reachable stations (approximate check: within initial range)
     reachable_range_km = (initial_fuel / efficiency) * 100
     candidates = [
         s for s in stations 
@@ -307,23 +286,18 @@ def solve_greedy_heuristic(metadata: dict) -> OptimizationResult:
     if not candidates:
         return OptimizationResult(stops=[], total_cost=0, total_savings=0, reasoning=["No reachable stations found with current fuel."], fuel_projection=[], solver_status="heuristic_failed")
 
-    # Pick cheapest
     best_station = candidates[0]
     
-    # Calculate fill amount: Need enough to finish trip from this station
     dist_remaining = metadata['total_km'] - best_station.km_along_route
     fuel_for_remainder = (dist_remaining * efficiency) / 100.0
     
-    # Fill enough to reach end + 5L reserve, but capped at tank size
     target_fill = fuel_for_remainder + 5.0
     fuel_on_arrival = initial_fuel - (best_station.km_along_route * efficiency / 100.0)
     liters_to_add = target_fill - fuel_on_arrival
     
-    # Clamp to tank capacity
     space_in_tank = tank_size - fuel_on_arrival
     liters_to_add = min(liters_to_add, space_in_tank)
     
-    # Calculate costs
     price = best_station.effective_price(0)
     cost = liters_to_add * price
     base_price = best_station.base_prices.get(0, 1.50)
@@ -646,4 +620,3 @@ async def optimize_fuel_strategy(
             result.reasoning = llm_explanation
         
     return result
-

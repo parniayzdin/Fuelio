@@ -86,7 +86,6 @@ def make_decision(input_data: DecisionInput) -> DecisionResult:
     vehicle = input_data.vehicle
     reserve_liters = vehicle.tank_size_liters * vehicle.reserve_fraction
 
-    # Calculate remaining fuel
     liters_remaining = calculate_liters_remaining(
         vehicle,
         input_data.fuel_anchor_type,
@@ -94,44 +93,36 @@ def make_decision(input_data: DecisionInput) -> DecisionResult:
         input_data.distance_since_fillup_km,
     )
 
-    # Calculate range
     range_km = calculate_range_km(liters_remaining, reserve_liters, vehicle.efficiency_l_per_100km)
 
-    # Calculate price trend
     price_delta, price_trend = calculate_price_trend(
         input_data.today_price, input_data.predicted_tomorrow
     )
 
-    # Apply decision rules
     decision: Literal["FILL", "NO_ACTION"] = "NO_ACTION"
     severity: Literal["low", "medium", "high"] = "low"
     confidence = 0.7
 
-    # Rule 1: Critical low fuel
     if range_km <= 30 or liters_remaining <= reserve_liters:
         decision = "FILL"
         severity = "high"
         confidence = 0.95
 
-    # Rule 2: Planned trip exceeds range
     elif input_data.planned_trip_km and input_data.planned_trip_km > range_km:
         decision = "FILL"
         severity = "high"
         confidence = 0.95
 
-    # Rule 3: Planned trip close to range limit
     elif input_data.planned_trip_km and input_data.planned_trip_km > 0.7 * range_km:
         decision = "FILL"
         severity = "medium"
         confidence = 0.8
 
-    # Rule 4: Prices rising and low range
     elif price_trend == "rising" and range_km < 120:
         decision = "FILL"
         severity = "medium"
         confidence = 0.75
 
-    # Default: No action needed
     else:
         decision = "NO_ACTION"
         severity = "low"

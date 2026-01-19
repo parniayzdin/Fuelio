@@ -11,7 +11,6 @@ from backend.app.models import Price
 
 logger = logging.getLogger(__name__)
 
-# Approximate centers for regions
 REGION_COORDS = {
     "toronto": (43.6532, -79.3832),
     "ottawa": (45.4215, -75.6972),
@@ -59,7 +58,6 @@ class FuelService:
         pyfuelprices stations are returned as dicts with 'available_fuels' dict {type: cost}.
         """
         try:
-            # Correct method name is find_fuel_locations_from_point
             stations = self.fuel_client.find_fuel_locations_from_point(coords, radius)
         except Exception as e:
             logger.error(f"Error finding stations at {coords}: {e}")
@@ -67,14 +65,12 @@ class FuelService:
 
         prices = []
         for station in stations:
-            # station is a dict, and available_fuels is a dict {fuel_type: cost}
             available_fuels = station.get("available_fuels", {})
             
             for fuel_type, cost in available_fuels.items():
                 if fuel_type.lower() in ["regular", "unleaded", "gasoline"]:
                     if cost > 0:
                         prices.append(cost)
-                    # We found a price for this station, move to next station
                     break
         
         if not prices:

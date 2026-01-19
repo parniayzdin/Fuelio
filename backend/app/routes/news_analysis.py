@@ -12,11 +12,9 @@ from google.genai.types import Tool, GoogleSearch, GenerateContentConfig
 
 router = APIRouter(prefix="/news", tags=["news"])
 
-# Configure Vertex AI - uses your GCP paid account
 GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT_ID")
 GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 
-# Fallback to API key for local dev
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 
 class NewsSource(BaseModel):
@@ -27,8 +25,8 @@ class NewsSource(BaseModel):
     publisher: str
 
 class NewsAnalysisResponse(BaseModel):
-    prediction: str  # "rising", "falling", "stable"
-    confidence: float  # 0.0 to 1.0
+    prediction: str
+    confidence: float
     summary: str
     reasoning: str
     sources: List[NewsSource]
@@ -104,7 +102,6 @@ def get_genai_client():
     Vertex AI is preferred when GCP project is configured.
     """
     if GOOGLE_CLOUD_PROJECT:
-        # Use Vertex AI with your paid GCP account
         print(f"Using Vertex AI with project: {GOOGLE_CLOUD_PROJECT}")
         return genai.Client(
             vertexai=True,
@@ -112,7 +109,6 @@ def get_genai_client():
             location=GOOGLE_CLOUD_LOCATION
         )
     elif GOOGLE_API_KEY:
-        # Fallback to API key (free tier)
         print("Using Gemini API with API key")
         return genai.Client(api_key=GOOGLE_API_KEY)
     else:

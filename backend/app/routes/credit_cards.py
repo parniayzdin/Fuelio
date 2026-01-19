@@ -33,7 +33,6 @@ async def get_credit_cards(
     )
     cards = result.scalars().all()
     
-    # Convert to response format
     response_cards = []
     for card in cards:
         benefits = None
@@ -65,7 +64,6 @@ async def add_credit_card(
     """
     Add a new credit card and fetch its benefits using GCP.
     """
-    # Create the card
     new_card = CreditCard(
         user_id=current_user.id,
         provider=card_data.provider,
@@ -78,18 +76,14 @@ async def add_credit_card(
     await db.commit()
     await db.refresh(new_card)
     
-    # Fetch benefits asynchronously
     benefits_data = await get_credit_card_benefits(card_data.provider)
     
-    # Check if there was an error
     if "error" in benefits_data:
-        # Save the card with error info in benefits
         new_card.benefits_json = json.dumps(benefits_data)
         new_card.last_updated = datetime.utcnow()
         await db.commit()
         await db.refresh(new_card)
         
-        # Return the card with error in benefits
         benefits = CreditCardBenefits(**{
             "gas_cashback_percent": None,
             "gas_cashback_cap": None,
@@ -98,7 +92,6 @@ async def add_credit_card(
             "notes": "Failed to fetch benefits. Please refresh after fixing API key."
         })
     else:
-        # Save the benefits
         new_card.benefits_json = json.dumps(benefits_data)
         new_card.last_updated = datetime.utcnow()
         await db.commit()
@@ -126,7 +119,6 @@ async def delete_credit_card(
     """
     Delete a credit card.
     """
-    # Check if card exists and belongs to user
     result = await db.execute(
         select(CreditCard).where(
             CreditCard.id == card_id,
@@ -154,7 +146,6 @@ async def refresh_card_benefits(
     """
     Refresh benefits for a specific credit card using GCP.
     """
-    # Check if card exists and belongs to user
     result = await db.execute(
         select(CreditCard).where(
             CreditCard.id == card_id,
@@ -166,10 +157,8 @@ async def refresh_card_benefits(
     if not card:
         raise HTTPException(status_code=404, detail="Credit card not found")
     
-    # Fetch fresh benefits
     benefits_data = await get_credit_card_benefits(card.provider)
     
-    # Update the card
     if "error" in benefits_data:
         card.benefits_json = json.dumps(benefits_data)
         benefits = CreditCardBenefits(**{

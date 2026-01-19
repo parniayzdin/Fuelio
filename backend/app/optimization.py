@@ -28,21 +28,16 @@ def optimize_fuel_purchases(
         Dict with optimization results and logs
     """
     
-    # Create CPLEX model
     mdl = Model(name='FuelOptimization')
     
-    # Time periods (days)
     num_periods = max(7, len(trips))
     periods = range(num_periods)
     
-    # Decision variables
-    # fx[t, s] = 1 if we fill up at station s in period t
     fill_decisions = mdl.binary_var_dict(
         ((t, s) for t in periods for s in range(len(stations))),
         name="fill"
     )
     
-    # fill_amount[t, s] = liters filled at station s in period t
     fill_amounts = mdl.continuous_var_dict(
         ((t, s) for t in periods for s in range(len(stations))),
         lb=0,
@@ -50,7 +45,6 @@ def optimize_fuel_purchases(
         name="fill_amount"
     )
     
-    # fuel_level[t] = fuel level at end of period t
     fuel_levels = mdl.continuous_var_dict(
         periods,
         lb=tank_capacity * reserve_fraction,
@@ -58,8 +52,6 @@ def optimize_fuel_purchases(
         name="fuel_level"
     )
     
-    #  ==== OBJECTIVE ====
-    # Minimize total fuel cost
     total_cost = mdl.sum(
         fill_amounts[t, s] * stations[s].get('price', 1.50)
         for t in periods
@@ -67,9 +59,6 @@ def optimize_fuel_purchases(
     )
     mdl.minimize(total_cost)
     
-    # ==== CONSTRAINTS ====
-    
-    # Initial fuel level
     mdl.add_constraint(
         fuel_levels[0] == current_fuel_level + mdl.sum(fill_amounts[0, s] for s in range(len(stations))) - sum(
             trip['distance_km'] * efficiency_l_per_100km / 100
@@ -79,7 +68,6 @@ def optimize_fuel_purchases(
         "initial_fuel"
     )
     
-    # Fuel level propagation
     for t in periods[1:]:
         trips_in_period = [
             trip for trip in trips
@@ -97,7 +85,6 @@ def optimize_fuel_purchases(
             f"fuel_balance_{t}"
         )
     
-    # Fill amount linked to fill decision
     for t in periods:
         for s in range(len(stations)):
             mdl.add_constraint(
@@ -105,24 +92,20 @@ def optimize_fuel_purchases(
                 f"link_fill_{t}_{s}"
             )
     
-    # Tank capacity constraint
     for t in periods:
         mdl.add_constraint(
             fuel_levels[t] <= tank_capacity,
             f"tank_cap_{t}"
         )
     
-    # At most one fillup per period
     for t in periods:
         mdl.add_constraint(
             mdl.sum(fill_decisions[t, s] for s in range(len(stations))) <= 1,
             f"one_fill_{t}"
         )
     
-    # Solve
     solution = mdl.solve(log_output=True)
     
-    # Extract results
     if solution:
         fill_schedule = []
         for t in periods:

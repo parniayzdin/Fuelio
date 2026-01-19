@@ -143,4 +143,3 @@ class CreditCard(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user: Mapped["User"] = relationship(back_populates="credit_cards")
-

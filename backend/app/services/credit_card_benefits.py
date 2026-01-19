@@ -16,10 +16,8 @@ from datetime import datetime
 from google import genai
 from google.genai.types import Tool, GoogleSearch, GenerateContentConfig
 
-# Cache for credit card providers (refreshed on server restart)
 _PROVIDERS_CACHE: Optional[list[str]] = None
 
-# Default fallback providers (always available, even if GCP fails)
 DEFAULT_PROVIDERS = [
     "Chase Freedom Flex",
     "Chase Freedom Unlimited",
@@ -35,11 +33,9 @@ DEFAULT_PROVIDERS = [
     "Sam's Club Mastercard",
 ]
 
-# Configure Vertex AI - uses your GCP paid account
 GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT_ID")
 GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 
-# Fallback to API key for local dev
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 
 def get_genai_client():
@@ -99,7 +95,6 @@ async def get_credit_card_benefits(provider: str) -> dict:
             "message": "Neither GOOGLE_CLOUD_PROJECT nor GOOGLE_API_KEY configured"
         }
     
-    # Create Google Search tool for grounding
     google_search_tool = Tool(google_search=GoogleSearch())
     
     prompt = f"""Search the web for the current gas and fuel-related benefits of the {provider} credit card.
@@ -196,18 +191,15 @@ async def get_supported_providers() -> list[str]:
     """
     global _PROVIDERS_CACHE
     
-    # Return cached results if available
     if _PROVIDERS_CACHE is not None:
         return _PROVIDERS_CACHE
     
     client = get_genai_client()
     
-    # If no client, return default providers immediately
     if not client:
         _PROVIDERS_CACHE = DEFAULT_PROVIDERS.copy()
         return _PROVIDERS_CACHE
     
-    # Try to fetch from GCP with Google Search
     try:
         google_search_tool = Tool(google_search=GoogleSearch())
         
