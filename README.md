@@ -26,7 +26,7 @@ Then open http://localhost in your browser.
 
 **Demo credentials:** `demo@example.com` / `demo1234`
 
-## Quick Start (Local Development)
+## Initialization (Local Development)
 ### Prerequisites
 - Python 3.12+
 - Node.js 20+
