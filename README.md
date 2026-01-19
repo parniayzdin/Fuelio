@@ -15,8 +15,6 @@ Fuelio is a smart application designed to help drivers optimize their fuel spend
 *   **FastAPI**: High-performance, async Python web framework.
 *   **Uvicorn**: ASGI server implementation.
 *   **PyFuelPrices**: Custom library integration for real-time fuel data.
-[Watch the demo video](docs/demo.mp4)
-
 
 ## Installation
 ```bash
@@ -57,17 +55,5 @@ python -m backend.seed
 npm install
 npm run dev
 ```
-
 Open http://localhost:8080
 
-## Environment Variables
-### Backend
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | Postgres connection string | `postgresql+asyncpg://postgres:postgres@localhost:5432/fuelup` |
-| `SECRET_KEY` | JWT secret key | - |
-
-### Frontend
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VITE_API_BASE_URL` | Backend API URL | `http://localhost:8000` |
