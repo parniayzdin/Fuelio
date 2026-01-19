@@ -127,3 +127,5 @@ websockets==15.0.1
 xmltodict==1.0.2
 yarl==1.22.0
 zipp==3.23.0
+pyomo==6.9.5
+ply==3.11
