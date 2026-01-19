@@ -5,18 +5,16 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
 import uuid
 
-
 def generate_uuid() -> str:
     return str(uuid.uuid4())
-
 
 class User(Base):
     __tablename__ = "users"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Nullable for OAuth users
-    google_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True, index=True)  # Google OAuth ID
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    google_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True, index=True)
     tos_accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -25,8 +23,6 @@ class User(Base):
     fillups: Mapped[list["Fillup"]] = relationship(back_populates="user")
     alerts: Mapped[list["Alert"]] = relationship(back_populates="user")
     credit_cards: Mapped[list["CreditCard"]] = relationship(back_populates="user")
-
-
 
 class Vehicle(Base):
     __tablename__ = "vehicles"
@@ -46,7 +42,6 @@ class Vehicle(Base):
 
     user: Mapped["User"] = relationship(back_populates="vehicle")
 
-
 class Trip(Base):
     __tablename__ = "trips"
 
@@ -64,7 +59,6 @@ class Trip(Base):
 
     user: Mapped["User"] = relationship(back_populates="trips")
 
-
 class Fillup(Base):
     __tablename__ = "fillups"
 
@@ -77,7 +71,6 @@ class Fillup(Base):
 
     user: Mapped["User"] = relationship(back_populates="fillups")
 
-
 class Region(Base):
     __tablename__ = "regions"
 
@@ -85,7 +78,6 @@ class Region(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
 
     prices: Mapped[list["Price"]] = relationship(back_populates="region")
-
 
 class Price(Base):
     __tablename__ = "prices"
@@ -97,22 +89,20 @@ class Price(Base):
 
     region: Mapped["Region"] = relationship(back_populates="prices")
 
-
 class Alert(Base):
     __tablename__ = "alerts"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    decision: Mapped[str] = mapped_column(String(20), nullable=False)  # FILL or NO_ACTION
-    severity: Mapped[str] = mapped_column(String(20), nullable=False)  # low, medium, high
+    decision: Mapped[str] = mapped_column(String(20), nullable=False)
+    severity: Mapped[str] = mapped_column(String(20), nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     explanation: Mapped[str] = mapped_column(Text, nullable=False)
-    status: Mapped[str] = mapped_column(String(20), default="new")  # new, acknowledged
+    status: Mapped[str] = mapped_column(String(20), default="new")
 
     user: Mapped["User"] = relationship(back_populates="alerts")
     notifications: Mapped[list["Notification"]] = relationship(back_populates="alert")
-
 
 class Notification(Base):
     __tablename__ = "notifications"
@@ -120,12 +110,11 @@ class Notification(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     alert_id: Mapped[str] = mapped_column(String(36), ForeignKey("alerts.id"), index=True)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True)
-    type: Mapped[str] = mapped_column(String(20), default="push")  # push, email, sms
-    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending, sent, failed
+    type: Mapped[str] = mapped_column(String(20), default="push")
+    status: Mapped[str] = mapped_column(String(20), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     alert: Mapped["Alert"] = relationship(back_populates="notifications")
-
 
 class GasStation(Base):
     __tablename__ = "gas_stations"
@@ -142,7 +131,6 @@ class GasStation(Base):
     last_updated: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     rating: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     user_ratings_total: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-
 
 class CreditCard(Base):
     __tablename__ = "credit_cards"

@@ -7,7 +7,6 @@ from typing import Literal
 import numpy as np
 from sklearn.linear_model import LinearRegression
 
-
 def calculate_trend(
     today_price: float, predicted_price: float
 ) -> Literal["rising", "flat", "falling"]:
@@ -19,7 +18,6 @@ def calculate_trend(
         return "falling"
     else:
         return "flat"
-
 
 def generate_forecast(
     today_price: float,

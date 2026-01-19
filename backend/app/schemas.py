@@ -2,26 +2,20 @@ from datetime import datetime
 from typing import Optional, Literal, Union
 from pydantic import BaseModel, EmailStr
 
-
-# Auth schemas
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
     lat: Optional[float] = None
     lng: Optional[float] = None
 
-
 class AuthResponse(BaseModel):
     token: str
-
 
 class UserResponse(BaseModel):
     id: str
     email: str
     tos_accepted_at: Optional[datetime] = None
 
-
-# Vehicle schemas
 class VehicleSchema(BaseModel):
     tank_size_liters: float = 50.0
     efficiency_l_per_100km: float = 8.5
@@ -33,8 +27,6 @@ class VehicleSchema(BaseModel):
     image_url: Optional[str] = None
     fuel_type: Optional[Literal["regular", "premium", "diesel", "electric"]] = "regular"
 
-
-# Trip schemas
 class TripCreate(BaseModel):
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
@@ -45,7 +37,6 @@ class TripCreate(BaseModel):
     end_location_lng: Optional[float] = None
     start_address: Optional[str] = None
     end_address: Optional[str] = None
-
 
 class TripResponse(BaseModel):
     id: str
@@ -59,14 +50,11 @@ class TripResponse(BaseModel):
     start_address: Optional[str] = None
     end_address: Optional[str] = None
 
-
-# Fillup schemas
 class FillupCreate(BaseModel):
     time: datetime
     full_tank_bool: bool = True
     fuel_percent_optional: Optional[float] = None
     liters_optional: Optional[float] = None
-
 
 class FillupResponse(BaseModel):
     id: str
@@ -75,18 +63,13 @@ class FillupResponse(BaseModel):
     fuel_percent_optional: Optional[float] = None
     liters_optional: Optional[float] = None
 
-
-# Region schemas
 class RegionResponse(BaseModel):
     id: str
     name: str
 
-
-# Price schemas
 class PriceResponse(BaseModel):
     day: str
     avg_price_per_liter: float
-
 
 class ForecastResponse(BaseModel):
     day: str
@@ -94,28 +77,21 @@ class ForecastResponse(BaseModel):
     delta_from_today: float
     trend: Literal["rising", "flat", "falling"]
 
-
-# Fuel anchor schemas
 class FuelAnchorPercent(BaseModel):
     type: Literal["percent"]
     percent: float
-
 
 class FuelAnchorDate(BaseModel):
     type: Literal["last_full_fillup_date"]
     date: str
 
-
 FuelAnchor = Union[FuelAnchorPercent, FuelAnchorDate]
 
-
-# Decision schemas
 class EvaluateRequest(BaseModel):
     region_id: str
-    fuel_anchor: dict  # Will be parsed as FuelAnchor
+    fuel_anchor: dict
     planned_trip_km: Optional[float] = None
     use_predicted_trip: Optional[bool] = False
-
 
 class Evidence(BaseModel):
     liters_remaining: Optional[float] = None
@@ -127,7 +103,6 @@ class Evidence(BaseModel):
     price_delta: Optional[float] = None
     price_trend: Optional[Literal["rising", "flat", "falling"]] = None
 
-
 class DecisionResponse(BaseModel):
     decision: Literal["FILL", "NO_ACTION"]
     severity: Literal["low", "medium", "high"]
@@ -135,14 +110,10 @@ class DecisionResponse(BaseModel):
     evidence: Evidence
     explanation: str
 
-
-# AI schemas
 class TripGuessResponse(BaseModel):
     probability_trip_next_24h: float
     expected_trip_distance_km: float
 
-
-# Alert schemas
 class AlertResponse(BaseModel):
     id: str
     date: str
@@ -151,8 +122,6 @@ class AlertResponse(BaseModel):
     explanation: str
     status: Literal["new", "acknowledged"]
 
-
-# Credit Card schemas
 class CreditCardBenefits(BaseModel):
     gas_cashback_percent: Optional[float] = None
     gas_cashback_cap: Optional[float] = None
@@ -160,10 +129,8 @@ class CreditCardBenefits(BaseModel):
     partner_stations: Optional[list[str]] = None
     notes: Optional[str] = None
 
-
 class CreditCardCreate(BaseModel):
     provider: str
-
 
 class CreditCardResponse(BaseModel):
     id: str

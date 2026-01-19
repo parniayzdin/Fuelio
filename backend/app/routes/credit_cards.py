@@ -12,7 +12,6 @@ from ..services.credit_card_benefits import get_credit_card_benefits, get_suppor
 
 router = APIRouter(prefix="/credit-cards", tags=["credit-cards"])
 
-
 @router.get("/providers", response_model=list[str])
 async def list_providers():
     """
@@ -20,7 +19,6 @@ async def list_providers():
     Results are cached after first fetch.
     """
     return await get_supported_providers()
-
 
 @router.get("", response_model=list[CreditCardResponse])
 async def get_credit_cards(
@@ -57,7 +55,6 @@ async def get_credit_cards(
         )
     
     return response_cards
-
 
 @router.post("", response_model=CreditCardResponse)
 async def add_credit_card(
@@ -120,7 +117,6 @@ async def add_credit_card(
         created_at=new_card.created_at
     )
 
-
 @router.delete("/{card_id}")
 async def delete_credit_card(
     card_id: str,
@@ -148,7 +144,6 @@ async def delete_credit_card(
     await db.commit()
     
     return {"status": "deleted", "id": card_id}
-
 
 @router.post("/{card_id}/refresh", response_model=CreditCardResponse)
 async def refresh_card_benefits(

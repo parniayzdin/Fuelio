@@ -7,7 +7,6 @@ import json
 from typing import List, Dict
 import os
 
-
 class OptimizationVectorStore:
     def __init__(self, persist_directory: str = "./chroma_db"):
         """Initialize ChromaDB client and collection."""
@@ -16,7 +15,6 @@ class OptimizationVectorStore:
             anonymized_telemetry=False
         ))
         
-        # Get or create collection
         self.collection = self.client.get_or_create_collection(
             name="optimization_logs",
             metadata={"description": "CPLEX optimization results and logs"}
@@ -30,7 +28,6 @@ class OptimizationVectorStore:
     ):
         """Store optimization result in vector DB."""
         
-        # Create document text combining key info
         doc_text = f"""
         Optimization Status: {result.get('status')}
         Total Cost: ${result.get('total_cost', 0):.2f}

@@ -18,14 +18,11 @@ from .routes.receipt_upload import router as receipt_router
 from .routes.credit_cards import router as credit_cards_router
 from .routes.fuel_strategy import router as fuel_strategy_router
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create tables on startup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
-
 
 app = FastAPI(
     title="Fuel Up Advisor API",
@@ -33,7 +30,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -42,7 +38,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
 app.include_router(auth_router)
 app.include_router(me_router)
 app.include_router(vehicle_router)
@@ -59,11 +54,9 @@ app.include_router(receipt_router)
 app.include_router(credit_cards_router)
 app.include_router(fuel_strategy_router)
 
-
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
-
 
 if __name__ == "__main__":
     import uvicorn

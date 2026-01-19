@@ -22,7 +22,6 @@ REGION_COORDS = {
     "sudbury": (46.4917, -80.9930),
 }
 
-
 class FuelService:
     def __init__(self):
         self.fuel_client = FuelPrices()
@@ -35,7 +34,6 @@ class FuelService:
 
     async def update_all_prices(self, db: AsyncSession):
         """Fetch and update prices for all configured regions."""
-        # Ensure client has data
         await self.initialize()
 
         today = date.today()
@@ -86,7 +84,6 @@ class FuelService:
 
     async def _save_price(self, db: AsyncSession, region_id: str, day: date, price_val: float):
         """Save or update price entry in DB."""
-        # Check if exists
         stmt = select(Price).where(Price.region_id == region_id, Price.day == day)
         result = await db.execute(stmt)
         existing = result.scalar_one_or_none()

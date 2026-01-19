@@ -9,7 +9,6 @@ from ..auth import get_current_user
 
 router = APIRouter(tags=["vehicle"])
 
-
 @router.get("/vehicle", response_model=VehicleSchema)
 async def get_vehicle(
     current_user: User = Depends(get_current_user),
@@ -22,7 +21,6 @@ async def get_vehicle(
     vehicle = result.scalar_one_or_none()
 
     if not vehicle:
-        # Return defaults if no vehicle configured
         return VehicleSchema()
 
     return VehicleSchema(
@@ -36,7 +34,6 @@ async def get_vehicle(
         image_url=vehicle.image_url,
         fuel_type=vehicle.fuel_type,
     )
-
 
 import os
 import httpx
@@ -83,7 +80,6 @@ async def fetch_car_image(make: str | None, model: str | None, year: int | None)
         
     return None
 
-
 import re
 
 async def fetch_car_efficiency(make: str, model: str, year: int) -> float | None:
@@ -113,8 +109,6 @@ async def fetch_car_efficiency(make: str, model: str, year: int) -> float | None
                 data = response.json()
                 items = data.get("items", [])
                 
-                # Regex to find patterns like "8.5 L/100km" or "8.5L/100km" or "8.5 l/100km"
-                # Captures the number part.
                 pattern = r"(\d{1,2}\.?\d?)\s?[lL]\/100\s?[kK][mM]"
                 
                 for item in items:
@@ -122,7 +116,6 @@ async def fetch_car_efficiency(make: str, model: str, year: int) -> float | None
                     match = re.search(pattern, snippet)
                     if match:
                         val = float(match.group(1))
-                        # Sanity check: between 3.0 and 30.0 L/100km
                         if 3.0 < val < 30.0:
                             print(f"DEBUG: Found efficiency {val} L/100km in snippet: {snippet[:50]}...")
                             return val
@@ -144,37 +137,29 @@ async def update_vehicle(
     )
     vehicle = result.scalar_one_or_none()
 
-    # DEBUG: Print incoming data
     print(f"DEBUG: update_vehicle make={vehicle_data.make} model={vehicle_data.model} eff={vehicle_data.efficiency_l_per_100km}")
 
-    # Logic for efficiency: Manual input > Web Scrape > Default
     should_autotune = True
     if vehicle_data.efficiency_l_per_100km and vehicle_data.efficiency_l_per_100km > 0.1:
-        # User provided a value > 0.1, keep it.
         should_autotune = False
     
     if should_autotune and vehicle_data.make:
-        # User left it blank (or 0), try to auto-tune from Web
         print("DEBUG: Auto-tuning efficiency from web...")
         fetched_eff = await fetch_car_efficiency(vehicle_data.make, vehicle_data.model, vehicle_data.year or 2020)
         
         if fetched_eff:
             vehicle_data.efficiency_l_per_100km = fetched_eff
         else:
-             # Default fallback if web search fails
             vehicle_data.efficiency_l_per_100km = 10.0
     elif should_autotune:
-         # No info provided, default
         vehicle_data.efficiency_l_per_100km = 9.0
 
     if vehicle:
-        # Update existing
         vehicle.tank_size_liters = vehicle_data.tank_size_liters
         vehicle.efficiency_l_per_100km = vehicle_data.efficiency_l_per_100km
         vehicle.reserve_fraction = vehicle_data.reserve_fraction
         vehicle.default_region_id = vehicle_data.default_region_id
         
-        # Detect model changes to re-fetch image if needed
         model_changed = (
             vehicle.make != vehicle_data.make or 
             vehicle.model != vehicle_data.model or 
@@ -186,14 +171,11 @@ async def update_vehicle(
         vehicle.year = vehicle_data.year
         vehicle.fuel_type = vehicle_data.fuel_type
         
-        # Use provided image or fetch new one if model changed/missing/empty
         if vehicle_data.image_url and vehicle_data.image_url.strip():
             vehicle.image_url = vehicle_data.image_url
         elif vehicle_data.image_url == "" or model_changed or not vehicle.image_url:
              vehicle.image_url = await fetch_car_image(vehicle.make, vehicle.model, vehicle.year)
     else:
-        # Create new
-        # Fetch image if not provided
         if not vehicle_data.image_url:
             vehicle_data.image_url = await fetch_car_image(vehicle_data.make, vehicle_data.model, vehicle_data.year)
             

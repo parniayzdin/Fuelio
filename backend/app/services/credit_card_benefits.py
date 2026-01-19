@@ -16,7 +16,6 @@ from datetime import datetime
 from google import genai
 from google.genai.types import Tool, GoogleSearch, GenerateContentConfig
 
-
 # Cache for credit card providers (refreshed on server restart)
 _PROVIDERS_CACHE: Optional[list[str]] = None
 
@@ -43,7 +42,6 @@ GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 # Fallback to API key for local dev
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 
-
 def get_genai_client():
     """
     Get the appropriate genai client - Vertex AI (paid) or API Key (free tier).
@@ -61,7 +59,6 @@ def get_genai_client():
         return genai.Client(api_key=GOOGLE_API_KEY)
     else:
         return None
-
 
 def extract_sources_from_grounding(grounding_metadata) -> List[dict]:
     """Extract real source URLs from Gemini's grounding metadata."""
@@ -81,7 +78,6 @@ def extract_sources_from_grounding(grounding_metadata) -> List[dict]:
             })
     
     return sources[:5]
-
 
 async def get_credit_card_benefits(provider: str) -> dict:
     """
@@ -139,17 +135,14 @@ Important:
             )
         )
         
-        # Extract sources from grounding metadata
         sources = []
         if response.candidates and len(response.candidates) > 0:
             candidate = response.candidates[0]
             grounding_metadata = getattr(candidate, 'grounding_metadata', None)
             sources = extract_sources_from_grounding(grounding_metadata)
         
-        # Parse the response text
         response_text = response.text.strip()
         
-        # Clean up response if it has markdown code blocks
         if response_text.startswith("```"):
             lines = response_text.split("\n")
             response_text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
@@ -160,7 +153,6 @@ Important:
         
         benefits_data = json.loads(response_text)
         
-        # Add sources to notes if available
         if sources and benefits_data.get("notes") is None:
             source_names = [s.get("title", "web source") for s in sources[:2]]
             benefits_data["notes"] = f"Data sourced from: {', '.join(source_names)}"
@@ -190,7 +182,6 @@ Important:
             "message": f"Failed to fetch benefits for {provider}: {error_msg}",
             "provider": provider
         }
-
 
 async def get_supported_providers() -> list[str]:
     """
@@ -244,7 +235,6 @@ Important:
         
         response_text = response.text.strip()
         
-        # Clean up response if it has markdown code blocks
         if response_text.startswith("```"):
             lines = response_text.split("\n")
             response_text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
@@ -263,6 +253,5 @@ Important:
             
     except Exception as e:
         print(f"Failed to fetch credit card providers from GCP: {e}")
-        # Return default list on any error
         _PROVIDERS_CACHE = DEFAULT_PROVIDERS.copy()
         return _PROVIDERS_CACHE

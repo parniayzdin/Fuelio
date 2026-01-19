@@ -19,14 +19,12 @@ GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 # Fallback to API key for local dev
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 
-
 class NewsSource(BaseModel):
     title: str
     url: str
     date: str
     snippet: str
     publisher: str
-
 
 class NewsAnalysisResponse(BaseModel):
     prediction: str  # "rising", "falling", "stable"
@@ -36,7 +34,6 @@ class NewsAnalysisResponse(BaseModel):
     sources: List[NewsSource]
     last_updated: str
 
-
 def extract_sources_from_grounding(grounding_metadata) -> List[dict]:
     """Extract real source URLs from Gemini's grounding metadata."""
     sources = []
@@ -44,7 +41,6 @@ def extract_sources_from_grounding(grounding_metadata) -> List[dict]:
     if not grounding_metadata:
         return sources
     
-    # Get grounding chunks which contain the actual web sources
     grounding_chunks = getattr(grounding_metadata, 'grounding_chunks', []) or []
     
     for chunk in grounding_chunks:
@@ -58,20 +54,17 @@ def extract_sources_from_grounding(grounding_metadata) -> List[dict]:
                 "publisher": extract_publisher(getattr(web, 'uri', ''))
             })
     
-    # Also check grounding_supports for additional context
     supports = getattr(grounding_metadata, 'grounding_supports', []) or []
     for support in supports:
         segment = getattr(support, 'segment', None)
         if segment:
             text = getattr(segment, 'text', '')
-            # Add snippet to matching source
             for source in sources:
                 if not source['snippet'] and text:
                     source['snippet'] = text[:200] + '...' if len(text) > 200 else text
                     break
     
-    return sources[:5]  # Limit to 5 sources
-
+    return sources[:5]
 
 def extract_publisher(url: str) -> str:
     """Extract publisher name from URL."""
@@ -98,14 +91,12 @@ def extract_publisher(url: str) -> str:
         if domain in url.lower():
             return name
     
-    # Extract domain as publisher
     try:
         from urllib.parse import urlparse
         parsed = urlparse(url)
         return parsed.netloc.replace('www.', '').split('.')[0].capitalize()
     except:
         return "News Source"
-
 
 def get_genai_client():
     """
@@ -130,13 +121,11 @@ def get_genai_client():
             detail="Neither GOOGLE_CLOUD_PROJECT nor GOOGLE_API_KEY configured"
         )
 
-
 async def analyze_with_gemini_search(region: str) -> dict:
     """Use Gemini with Google Search grounding to analyze real news."""
     
     client = get_genai_client()
     
-    # Create Google Search tool for grounding
     google_search_tool = Tool(google_search=GoogleSearch())
     
     prompt = f"""Search for the latest news about oil prices, gas prices, and fuel costs in Canada, 
@@ -164,17 +153,14 @@ Base your analysis on the actual news articles you find through your search."""
             )
         )
         
-        # Extract sources from grounding metadata
         sources = []
         if response.candidates and len(response.candidates) > 0:
             candidate = response.candidates[0]
             grounding_metadata = getattr(candidate, 'grounding_metadata', None)
             sources = extract_sources_from_grounding(grounding_metadata)
         
-        # Parse the response text
         response_text = response.text.strip()
         
-        # Clean up response if it has markdown code blocks
         if response_text.startswith("```"):
             lines = response_text.split("\n")
             response_text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
@@ -185,7 +171,6 @@ Base your analysis on the actual news articles you find through your search."""
         
         result = json.loads(response_text)
         
-        # Normalize prediction
         result["prediction"] = result.get("prediction", "stable").lower()
         if result["prediction"] not in ["rising", "falling", "stable"]:
             result["prediction"] = "stable"
@@ -196,7 +181,6 @@ Base your analysis on the actual news articles you find through your search."""
         return result
         
     except json.JSONDecodeError as e:
-        # Return parsed response even if JSON parsing fails
         return {
             "prediction": "stable",
             "confidence": 0.5,
@@ -206,7 +190,6 @@ Base your analysis on the actual news articles you find through your search."""
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gemini API error: {str(e)}")
-
 
 @router.get("/analysis", response_model=NewsAnalysisResponse)
 async def get_news_analysis(region: str = "toronto"):

@@ -25,7 +25,6 @@ if GOOGLE_MAPS_API_KEY:
     except Exception as e:
         print(f"Warning: Failed to initialize Google Maps client: {e}")
 
-
 class GasStation(BaseModel):
     id: str
     name: str
@@ -41,7 +40,6 @@ class GasStation(BaseModel):
     rating: Optional[float] = None
     user_ratings_total: Optional[int] = None
 
-
 def extract_brand_from_name(name: str) -> str:
     """Extract gas station brand from the place name."""
     brands = [
@@ -55,13 +53,10 @@ def extract_brand_from_name(name: str) -> str:
         if brand.upper() in name_upper:
             return brand
     
-    # Default to the first word of the name
     return name.split()[0] if name else "Gas Station"
-
 
 from ..services.fuel_service import FuelService
 
-# Initialize FuelService
 fuel_service = FuelService()
 fuel_service_initialized = False
 
@@ -343,7 +338,6 @@ async def get_nearby_gas_stations(
         final_list.sort(key=lambda s: s.regular if s.regular else 999)
         return final_list
 
-        
     except googlemaps.exceptions.ApiError as e:
         error_msg = str(e)
         if "legacy API" in error_msg or "REQUEST_DENIED" in error_msg:
@@ -362,21 +356,19 @@ async def get_nearby_gas_stations(
             detail=f"Error fetching gas stations: {str(e)}"
         )
 
-
 class StationRecommendation(BaseModel):
     """A recommended gas station with credit card optimization."""
     station: GasStation
     distance_km: float
     fuel_cost_to_drive: float
     base_price_per_liter: float
-    effective_price_per_liter: float  # After cashback
+    effective_price_per_liter: float
     total_cost_for_tank: float
     savings_vs_average: float
     rank: int
     reasoning: str
     best_card_to_use: Optional[str] = None
     card_savings: float = 0
-
 
 class CardRecommendation(BaseModel):
     """Credit card recommendation for better gas savings."""
@@ -386,7 +378,6 @@ class CardRecommendation(BaseModel):
     effective_price_with_card: float
     why_recommended: str
 
-
 class OptimalStationResponse(BaseModel):
     """Response with optimal station and card recommendations."""
     optimal: StationRecommendation
@@ -395,11 +386,10 @@ class OptimalStationResponse(BaseModel):
     card_recommendations: list[CardRecommendation]
     your_cards_used: list[str]
 
-
 def haversine_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     """Calculate distance between two points in kilometers using Haversine formula."""
     import math
-    R = 6371  # Earth's radius in km
+    R = 6371
     
     lat1_rad = math.radians(lat1)
     lat2_rad = math.radians(lat2)
@@ -410,7 +400,6 @@ def haversine_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> fl
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     
     return R * c
-
 
 @router.get("/optimal", response_model=OptimalStationResponse)
 async def get_optimal_gas_station(

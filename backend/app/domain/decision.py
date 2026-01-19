@@ -5,13 +5,11 @@ Implements the deterministic decision rules as specified.
 from dataclasses import dataclass
 from typing import Optional, Literal
 
-
 @dataclass
 class VehicleConfig:
     tank_size_liters: float
     efficiency_l_per_100km: float
     reserve_fraction: float
-
 
 @dataclass
 class DecisionInput:
@@ -22,7 +20,6 @@ class DecisionInput:
     planned_trip_km: Optional[float] = None
     today_price: Optional[float] = None
     predicted_tomorrow: Optional[float] = None
-
 
 @dataclass
 class DecisionResult:
@@ -38,7 +35,6 @@ class DecisionResult:
     price_delta: Optional[float]
     price_trend: Optional[Literal["rising", "flat", "falling"]]
 
-
 def calculate_liters_remaining(
     vehicle: VehicleConfig,
     fuel_anchor_type: str,
@@ -52,15 +48,12 @@ def calculate_liters_remaining(
         liters_used = distance_since_fillup_km * (vehicle.efficiency_l_per_100km / 100)
         return max(0, vehicle.tank_size_liters - liters_used)
     else:
-        # Default to 50% if no valid anchor
         return vehicle.tank_size_liters * 0.5
-
 
 def calculate_range_km(liters_remaining: float, reserve_liters: float, efficiency: float) -> float:
     """Calculate usable range in km."""
     usable_liters = max(0, liters_remaining - reserve_liters)
     return usable_liters / (efficiency / 100)
-
 
 def calculate_price_trend(
     today_price: Optional[float], predicted_tomorrow: Optional[float]
@@ -78,7 +71,6 @@ def calculate_price_trend(
         trend = "flat"
 
     return delta, trend
-
 
 def make_decision(input_data: DecisionInput) -> DecisionResult:
     """

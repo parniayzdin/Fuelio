@@ -4,7 +4,6 @@ Produces templated text explanations that can be swapped for LLM later.
 """
 from typing import Literal, Optional
 
-
 def generate_explanation(
     decision: Literal["FILL", "NO_ACTION"],
     severity: Literal["low", "medium", "high"],

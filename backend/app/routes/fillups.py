@@ -9,7 +9,6 @@ from ..auth import get_current_user
 
 router = APIRouter(prefix="/fillups", tags=["fillups"])
 
-
 @router.get("", response_model=list[FillupResponse])
 async def get_fillups(
     current_user: User = Depends(get_current_user),
@@ -33,7 +32,6 @@ async def get_fillups(
         )
         for fillup in fillups
     ]
-
 
 @router.post("", response_model=FillupResponse, status_code=status.HTTP_201_CREATED)
 async def create_fillup(

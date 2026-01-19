@@ -10,7 +10,6 @@ from ..auth import get_current_user
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
-
 @router.get("/trip-guess", response_model=TripGuessResponse)
 async def get_trip_guess(
     region_id: str = Query(...),
