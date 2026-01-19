@@ -16,7 +16,6 @@ from ..auth import get_current_user
 
 router = APIRouter()
 
-
 async def extract_receipt_data(image_bytes: bytes) -> dict:
     """Use Google Cloud Vision API to extract text from receipt image."""
     
@@ -24,10 +23,8 @@ async def extract_receipt_data(image_bytes: bytes) -> dict:
     if not api_key:
         raise HTTPException(status_code=500, detail="Google API key not configured")
     
-    # Encode image to base64
     image_base64 = base64.b64encode(image_bytes).decode('utf-8')
     
-    # Call Cloud Vision API
     url = f"https://vision.googleapis.com/v1/images:annotate?key={api_key}"
     
     request_body = {
@@ -44,25 +41,20 @@ async def extract_receipt_data(image_bytes: bytes) -> dict:
     if "error" in result:
         raise HTTPException(status_code=500, detail=f"Vision API error: {result['error']}")
     
-    # Extract text
     try:
         full_text = result['responses'][0]['textAnnotations'][0]['description']
     except (KeyError, IndexError):
         return {"price": None, "liters": None, "time": None, "raw_text": ""}
     
-    # Parse for price (look for $ followed by numbers)
     price_pattern = r'\$?\s*(\d+\.?\d*)\s*/?\s*L'
     price_match = re.search(price_pattern, full_text, re.IGNORECASE)
     
-    # Parse for total amount
     total_pattern = r'(?:total|amount|subtotal)[:\s]*\$?\s*(\d+\.?\d*)'
     total_match = re.search(total_pattern, full_text, re.IGNORECASE)
     
-    # Parse for liters
     liters_pattern = r'(\d+\.?\d*)\s*(?:L|liters?|litres?)'
     liters_match = re.search(liters_pattern, full_text, re.IGNORECASE)
     
-    # Parse for date/time
     date_pattern = r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})'
     date_match = re.search(date_pattern, full_text)
     
@@ -75,9 +67,8 @@ async def extract_receipt_data(image_bytes: bytes) -> dict:
         "liters": float(liters_match.group(1)) if liters_match else None,
         "date": date_match.group(1) if date_match else None,
         "time": time_match.group(1) if time_match else None,
-        "raw_text": full_text[:500]  # Return first 500 chars for debugging
+        "raw_text": full_text[:500]
     }
-
 
 @router.post("/fillups/upload-receipt")
 async def upload_receipt(
@@ -87,24 +78,18 @@ async def upload_receipt(
 ):
     """Upload a receipt image and extract fillup data using OCR."""
     
-    # Validate file type
     if not file.content_type or not file.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="File must be an image")
     
-    # Read image bytes
     image_bytes = await file.read()
     
-    # Extract data using Vision API
     extracted = await extract_receipt_data(image_bytes)
     
-    # Create fillup record if we extracted useful data
     fillup = None
     if extracted.get("liters") or extracted.get("total_amount"):
-        # Determine time
         fillup_time = datetime.utcnow()
         if extracted.get("date"):
             try:
-                # Try parsing date
                 for fmt in ["%m/%d/%Y", "%d/%m/%Y", "%m-%d-%Y", "%d-%m-%Y", "%m/%d/%y", "%d/%m/%y"]:
                     try:
                         fillup_time = datetime.strptime(extracted["date"], fmt)
@@ -130,7 +115,6 @@ async def upload_receipt(
         "fillup_created": fillup is not None,
         "fillup_id": fillup.id if fillup else None
     }
-
 
 @router.get("/fillups/history")
 async def get_fillup_history(

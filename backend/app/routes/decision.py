@@ -12,7 +12,6 @@ from ..domain.explanation import generate_explanation
 
 router = APIRouter(prefix="/decision", tags=["decision"])
 
-
 @router.post("/evaluate", response_model=DecisionResponse)
 async def evaluate_decision(
     request: EvaluateRequest,
@@ -20,7 +19,6 @@ async def evaluate_decision(
     db: AsyncSession = Depends(get_db),
 ):
     """Evaluate whether to fill up based on current conditions."""
-    # Get vehicle config
     result = await db.execute(
         select(Vehicle).where(Vehicle.user_id == current_user.id)
     )
@@ -39,7 +37,6 @@ async def evaluate_decision(
             reserve_fraction=0.1,
         )
 
-    # Parse fuel anchor
     fuel_anchor = request.fuel_anchor
     fuel_anchor_type = fuel_anchor.get("type", "percent")
     fuel_percent = None
@@ -48,14 +45,12 @@ async def evaluate_decision(
     if fuel_anchor_type == "percent":
         fuel_percent = fuel_anchor.get("percent", 50)
     else:
-        # Calculate distance since last full fillup
         fillup_date_str = fuel_anchor.get("date", "")
         try:
             fillup_date = datetime.strptime(fillup_date_str, "%Y-%m-%d")
         except ValueError:
             fillup_date = datetime.now() - timedelta(days=7)
 
-        # Sum trip distances after that date
         result = await db.execute(
             select(Trip)
             .where(Trip.user_id == current_user.id, Trip.start_time >= fillup_date)
@@ -63,7 +58,6 @@ async def evaluate_decision(
         trips = result.scalars().all()
         distance_since_fillup = sum(t.distance_km for t in trips)
 
-    # Get today's price
     today = date.today()
     result = await db.execute(
         select(Price)
@@ -72,7 +66,6 @@ async def evaluate_decision(
     price_today = result.scalar_one_or_none()
     today_price = price_today.avg_price_per_liter if price_today else None
 
-    # Get last 7 days prices for prediction
     week_ago = today - timedelta(days=7)
     result = await db.execute(
         select(Price)
@@ -88,12 +81,9 @@ async def evaluate_decision(
         sum(p.avg_price_per_liter for p in prices) / len(prices) if prices else None
     )
 
-    # Get planned trip km
     planned_trip_km = request.planned_trip_km
 
-    # If using predicted trip, get the AI guess
     if request.use_predicted_trip and not planned_trip_km:
-        # Simple weekday-based prediction
         tomorrow = datetime.now() + timedelta(days=1)
         target_weekday = tomorrow.weekday()
         two_weeks_ago = datetime.now() - timedelta(days=14)
@@ -112,9 +102,8 @@ async def evaluate_decision(
         if weekday_trips:
             planned_trip_km = sum(t.distance_km for t in weekday_trips) / len(weekday_trips)
         else:
-            planned_trip_km = 15  # Default
+            planned_trip_km = 15
 
-    # Make decision
     decision_input = DecisionInput(
         vehicle=vehicle_config,
         fuel_anchor_type=fuel_anchor_type,
@@ -127,7 +116,6 @@ async def evaluate_decision(
 
     decision_result = make_decision(decision_input)
 
-    # Generate explanation
     explanation = generate_explanation(
         decision=decision_result.decision,
         severity=decision_result.severity,
@@ -139,7 +127,6 @@ async def evaluate_decision(
         today_price=decision_result.today_price,
     )
 
-    # If decision is FILL, create alert and notification
     if decision_result.decision == "FILL":
         alert = Alert(
             user_id=current_user.id,

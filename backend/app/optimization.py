@@ -5,7 +5,6 @@ from docplex.mp.model import Model
 from typing import List, Dict, Tuple
 from datetime import datetime, timedelta
 
-
 def optimize_fuel_purchases(
     trips: List[Dict],
     stations: List[Dict],

@@ -8,7 +8,6 @@ from backend.app.domain.decision import (
     calculate_range_km,
 )
 
-
 @pytest.fixture
 def default_vehicle():
     return VehicleConfig(
@@ -16,7 +15,6 @@ def default_vehicle():
         efficiency_l_per_100km=8.0,
         reserve_fraction=0.1,
     )
-
 
 class TestCalculateLitersRemaining:
     def test_percent_anchor(self, default_vehicle):
@@ -32,37 +30,29 @@ class TestCalculateLitersRemaining:
         assert result == 0.0
 
     def test_date_anchor(self, default_vehicle):
-        # Drove 100km at 8L/100km = 8L used
         result = calculate_liters_remaining(
             default_vehicle, "last_full_fillup_date", distance_since_fillup_km=100
         )
         assert result == 42.0
 
     def test_date_anchor_more_than_tank(self, default_vehicle):
-        # Drove enough to use more than tank capacity
         result = calculate_liters_remaining(
             default_vehicle, "last_full_fillup_date", distance_since_fillup_km=1000
         )
         assert result == 0.0
 
-
 class TestCalculateRangeKm:
     def test_basic_range(self):
-        # 25L remaining, 5L reserve, 8L/100km efficiency
-        # Usable = 20L, range = 20 / 0.08 = 250km
         result = calculate_range_km(25.0, 5.0, 8.0)
         assert result == 250.0
 
     def test_at_reserve(self):
-        # 5L remaining, 5L reserve = 0 usable
         result = calculate_range_km(5.0, 5.0, 8.0)
         assert result == 0.0
 
     def test_below_reserve(self):
-        # 3L remaining, 5L reserve = negative clipped to 0
         result = calculate_range_km(3.0, 5.0, 8.0)
         assert result == 0.0
-
 
 class TestMakeDecision:
     def test_critical_low_fuel(self, default_vehicle):
@@ -70,7 +60,7 @@ class TestMakeDecision:
         input_data = DecisionInput(
             vehicle=default_vehicle,
             fuel_anchor_type="percent",
-            fuel_percent=5,  # Very low
+            fuel_percent=5,
         )
         result = make_decision(input_data)
         assert result.decision == "FILL"
@@ -82,7 +72,7 @@ class TestMakeDecision:
             vehicle=default_vehicle,
             fuel_anchor_type="percent",
             fuel_percent=30,
-            planned_trip_km=500,  # Way more than range
+            planned_trip_km=500,
         )
         result = make_decision(input_data)
         assert result.decision == "FILL"
@@ -93,8 +83,8 @@ class TestMakeDecision:
         input_data = DecisionInput(
             vehicle=default_vehicle,
             fuel_anchor_type="percent",
-            fuel_percent=50,  # 25L = ~250km range after reserve
-            planned_trip_km=200,  # > 70% of 250km
+            fuel_percent=50,
+            planned_trip_km=200,
         )
         result = make_decision(input_data)
         assert result.decision == "FILL"
@@ -105,9 +95,9 @@ class TestMakeDecision:
         input_data = DecisionInput(
             vehicle=default_vehicle,
             fuel_anchor_type="percent",
-            fuel_percent=20,  # ~100km range
+            fuel_percent=20,
             today_price=1.40,
-            predicted_tomorrow=1.50,  # Rising by 10 cents
+            predicted_tomorrow=1.50,
         )
         result = make_decision(input_data)
         assert result.decision == "FILL"
@@ -118,9 +108,9 @@ class TestMakeDecision:
         input_data = DecisionInput(
             vehicle=default_vehicle,
             fuel_anchor_type="percent",
-            fuel_percent=80,  # Plenty of fuel
+            fuel_percent=80,
             today_price=1.45,
-            predicted_tomorrow=1.45,  # Stable
+            predicted_tomorrow=1.45,
         )
         result = make_decision(input_data)
         assert result.decision == "NO_ACTION"

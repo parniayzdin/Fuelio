@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Seed the database with historical price data for all regions.
 
@@ -18,7 +17,6 @@ from backend.app.services.fuel_service import FuelService
 from backend.app.models import Price, Region
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-
 
 async def seed_regions(session: AsyncSession):
     """Ensure all regions exist in the database."""
@@ -47,7 +45,6 @@ async def seed_regions(session: AsyncSession):
     
     await session.commit()
 
-
 async def seed_prices(session: AsyncSession, days: int = 14):
     """Seed price data for the last N days."""
     fuel_service = FuelService()
@@ -61,13 +58,11 @@ async def seed_prices(session: AsyncSession, days: int = 14):
         print("   Will generate approximate prices based on regional averages")
         return await seed_fallback_prices(session, days)
     
-    # Get today's prices first
     today = date.today()
     print(f"\n📅 Seeding prices for {days} days (ending {today})...")
     
     results = await fuel_service.update_all_prices(session)
     
-    # Store today's prices for historical data generation
     today_prices = {}
     for region_id, price in results.items():
         if price:
@@ -76,13 +71,11 @@ async def seed_prices(session: AsyncSession, days: int = 14):
         else:
             print(f"⚠️  {region_id}: No data available")
     
-    # Generate historical data (prices fluctuate ±3% per day)
     print(f"\n📈 Generating {days-1} days of historical data...")
     for region_id, today_price in today_prices.items():
         for day_offset in range(1, days):
             past_date = today - timedelta(days=day_offset)
             
-            # Check if price already exists
             result = await session.execute(
                 select(Price).where(
                     Price.region_id == region_id,
@@ -94,9 +87,7 @@ async def seed_prices(session: AsyncSession, days: int = 14):
             if existing:
                 continue
             
-            # Generate historical price with slight variation
-            # Older prices tend to be slightly different
-            variation = (0.97 + (day_offset * 0.005))  # Slight downward trend
+            variation = (0.97 + (day_offset * 0.005))
             historical_price = today_price * variation
             
             price_entry = Price(
@@ -111,12 +102,10 @@ async def seed_prices(session: AsyncSession, days: int = 14):
     await session.commit()
     print(f"\n✅ Successfully seeded price data!")
 
-
 async def seed_fallback_prices(session: AsyncSession, days: int = 14):
     """Fallback method using approximate regional prices."""
     print("\n📊 Using fallback prices based on regional averages...")
     
-    # Approximate base prices for Ontario regions (as of Jan 2026)
     regional_prices = {
         "toronto": 1.42,
         "ottawa": 1.45,
@@ -133,7 +122,6 @@ async def seed_fallback_prices(session: AsyncSession, days: int = 14):
         for day_offset in range(days):
             past_date = today - timedelta(days=day_offset)
             
-            # Check if price already exists
             result = await session.execute(
                 select(Price).where(
                     Price.region_id == region_id,
@@ -145,10 +133,9 @@ async def seed_fallback_prices(session: AsyncSession, days: int = 14):
             if existing:
                 continue
             
-            # Add slight variation based on day
             import random
             random.seed(f"{region_id}-{past_date}".encode())
-            variation = 1.0 + (random.random() - 0.5) * 0.06  # ±3% variation
+            variation = 1.0 + (random.random() - 0.5) * 0.06
             price = base_price * variation
             
             price_entry = Price(
@@ -163,25 +150,20 @@ async def seed_fallback_prices(session: AsyncSession, days: int = 14):
     await session.commit()
     print(f"\n✅ Successfully seeded fallback price data!")
 
-
 async def main():
     """Main seeding function."""
     print("=" * 60)
     print("   Fuel Up Advisor - Price Data Seeding")
     print("=" * 60)
     
-    # Create tables if they don't exist
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     
-    # Get database session
     async for session in get_db():
         try:
-            # Seed regions first
             print("\n🌍 Seeding regions...")
             await seed_regions(session)
             
-            # Seed price data
             await seed_prices(session, days=14)
             
             print("\n" + "=" * 60)
@@ -195,8 +177,7 @@ async def main():
             raise
         finally:
             await session.close()
-            break  # Only need one iteration
-
+            break
 
 if __name__ == "__main__":
     asyncio.run(main())

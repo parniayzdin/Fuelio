@@ -14,7 +14,7 @@ router = APIRouter(prefix="/prices", tags=["prices"])
 @router.post("/refresh")
 async def refresh_prices(
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(get_current_user), # Admin only in real app, but authenticated for now
+    _: dict = Depends(get_current_user),
 ):
     """Trigger update of real fuel prices from external source."""
     from ..services.fuel_service import FuelService
@@ -26,14 +26,12 @@ async def refresh_prices(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.get("/regions", response_model=list[RegionResponse])
 async def get_regions(db: AsyncSession = Depends(get_db)):
     """Get all available regions."""
     result = await db.execute(select(Region).order_by(Region.name))
     regions = result.scalars().all()
     return [RegionResponse(id=r.id, name=r.name) for r in regions]
-
 
 @router.get("/{region_id}/today", response_model=PriceResponse)
 async def get_today_price(
@@ -51,7 +49,6 @@ async def get_today_price(
     price = result.scalar_one_or_none()
 
     if not price:
-        # Try yesterday if today not available
         yesterday = today - timedelta(days=1)
         result = await db.execute(
             select(Price)
@@ -66,7 +63,6 @@ async def get_today_price(
         day=price.day.isoformat(),
         avg_price_per_liter=price.avg_price_per_liter,
     )
-
 
 @router.get("/{region_id}/series", response_model=list[PriceResponse])
 async def get_price_series(
@@ -90,7 +86,6 @@ async def get_price_series(
         for p in prices
     ]
 
-
 @router.get("/{region_id}/forecast", response_model=list[ForecastResponse])
 async def get_price_forecast(
     region_id: str,
@@ -102,7 +97,6 @@ async def get_price_forecast(
     today = date.today()
     week_ago = today - timedelta(days=7)
 
-    # Get last 7 days of prices
     result = await db.execute(
         select(Price)
         .where(Price.region_id == region_id, Price.day >= week_ago, Price.day <= today)

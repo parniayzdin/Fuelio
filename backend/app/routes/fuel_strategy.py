@@ -12,15 +12,12 @@ from ..db import get_db
 from ..models import GasStation as GasStationModel, CreditCard as CreditCardModel
 from ..services.fuel_strategy_optimizer import optimize_fuel_strategy
 
-
 router = APIRouter(prefix="/fuel-strategy", tags=["fuel-strategy"])
-
 
 class TripPoint(BaseModel):
     """A point along the trip route."""
     lat: float
     lng: float
-
 
 class FuelStrategyRequest(BaseModel):
     """Request for fuel strategy optimization."""
@@ -31,7 +28,6 @@ class FuelStrategyRequest(BaseModel):
     current_fuel_percent: float = 30.0
     search_radius_km: float = 20.0
 
-
 class StationInfo(BaseModel):
     """Gas station information."""
     id: str
@@ -40,7 +36,6 @@ class StationInfo(BaseModel):
     address: str
     lat: float
     lng: float
-
 
 class FillUpStopResponse(BaseModel):
     """A recommended fill-up stop."""
@@ -55,13 +50,11 @@ class FillUpStopResponse(BaseModel):
     savings_from_card: float
     savings_from_timing: float
 
-
 class FuelProjectionPoint(BaseModel):
     """Fuel level at a point along the route."""
     km: float
     fuel_pct: float
     action: Optional[str] = None
-
 
 class FuelStrategyResponse(BaseModel):
     """Response with optimal fuel strategy."""
@@ -73,7 +66,6 @@ class FuelStrategyResponse(BaseModel):
     solver_status: str
     stations_analyzed: int
     trip_distance_km: float
-
 
 @router.post("/optimize", response_model=FuelStrategyResponse)
 async def optimize_trip_fuel_strategy(

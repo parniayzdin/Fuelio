@@ -13,7 +13,6 @@ from ..auth import get_current_user
 
 router = APIRouter(prefix="/trips", tags=["trips"])
 
-# Initialize Google Maps client
 GOOGLE_MAPS_API_KEY = os.getenv("VITE_GOOGLE_MAPS_API_KEY") or os.getenv("GOOGLE_MAPS_API_KEY")
 gmaps = None
 if GOOGLE_MAPS_API_KEY:
@@ -22,22 +21,17 @@ if GOOGLE_MAPS_API_KEY:
     except Exception as e:
         print(f"Warning: Failed to initialize Google Maps client: {e}")
 
-
 def reverse_geocode(lat: float, lng: float) -> Optional[str]:
     """Get readable address/landmark from coordinates."""
     if not gmaps:
         return None
     try:
-        # result_type='point_of_interest' prefers landmarks
-        # result_type='street_address' falls back to address
         results = gmaps.reverse_geocode((lat, lng))
         if results:
-            # Return formatted address of first result
             return results[0].get("formatted_address")
     except Exception as e:
         print(f"Geocoding error for {lat},{lng}: {e}")
     return None
-
 
 @router.get("", response_model=list[TripResponse])
 async def get_trips(
@@ -68,7 +62,6 @@ async def get_trips(
         for trip in trips
     ]
 
-
 @router.post("", response_model=TripResponse, status_code=status.HTTP_201_CREATED)
 async def create_trip(
     trip_data: TripCreate,
@@ -86,9 +79,8 @@ async def create_trip(
         dlat = lat2 - lat1
         a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
         c = 2 * asin(sqrt(a))
-        return c * 6371  # Earth radius in km
+        return c * 6371
     
-    # Calculate distance if not provided but locations are
     distance = trip_data.distance_km
     if distance is None and all([
         trip_data.start_location_lat,
@@ -103,7 +95,6 @@ async def create_trip(
             trip_data.end_location_lng
         )
     
-    # Auto-geocode if addresses missing
     start_addr = trip_data.start_address
     end_addr = trip_data.end_address
     
@@ -113,14 +104,12 @@ async def create_trip(
     if not end_addr and trip_data.end_location_lat and trip_data.end_location_lng:
         end_addr = reverse_geocode(trip_data.end_location_lat, trip_data.end_location_lng)
 
-    # Validate: Reject trips with no distance
     if distance is None or distance <= 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Trip must have a valid distance greater than 0"
         )
     
-    # Validate: Reject trips where geocoding failed (no addresses)
     if not start_addr or not end_addr:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -156,7 +145,6 @@ async def create_trip(
         end_address=trip.end_address,
     )
 
-
 @router.post("/import-timeline", status_code=status.HTTP_201_CREATED)
 async def import_timeline(
     file: UploadFile = File(...),
@@ -175,52 +163,37 @@ async def import_timeline(
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON format")
 
-    # Handle different Google Takeout formats
-    # Format 1: "timelineObjects" list with "activitySegment"
-    # Format 2: Top-level object with semanticSegments
-    
     segments = []
     
     if "timelineObjects" in data:
         for obj in data["timelineObjects"]:
             if "activitySegment" in obj:
                 segments.append(obj["activitySegment"])
-    elif "semanticSegments" in data: # Newer format
+    elif "semanticSegments" in data:
         for obj in data["semanticSegments"]:
-             if "activity" in obj: # Sometimes nested differently, adjust as needed
-                 # Actually semanticSegments list usually contains objects that HAVE 'visit' or 'activity'
-                 # 'activity' usually means travel
+             if "activity" in obj:
                  segments.append(obj)
                  
     imported_count = 0
     
-    # Process segments (focusing on vehicle travel)
     for segment in segments:
-        # Detect transport type
         activity_type = segment.get("activityType", "").upper()
         if not activity_type:
-            # Try deeper path for some formats
              activity_type = segment.get("activity", {}).get("topCandidate", {}).get("type", "").upper()
 
         if activity_type not in ["IN_PASSENGER_VEHICLE", "IN_VEHICLE", "DRIVING", "IN_CAR"]:
             continue
             
-        # Extract start/end
         try:
-            # Different formats have different date structures
-            # Expecting ISO strings or similar
             
-            # Start
             start_loc = segment.get("startLocation", {})
             start_lat = start_loc.get("latitudeE7") / 1e7 if "latitudeE7" in start_loc else None
             start_lng = start_loc.get("longitudeE7") / 1e7 if "longitudeE7" in start_loc else None
             
-            # End
             end_loc = segment.get("endLocation", {})
             end_lat = end_loc.get("latitudeE7") / 1e7 if "latitudeE7" in end_loc else None
             end_lng = end_loc.get("longitudeE7") / 1e7 if "longitudeE7" in end_loc else None
             
-            # Time
             duration = segment.get("duration", {})
             start_ts = duration.get("startTimestamp")
             end_ts = duration.get("endTimestamp")
@@ -231,11 +204,9 @@ async def import_timeline(
             start_time = datetime.fromisoformat(start_ts.replace("Z", "+00:00"))
             end_time = datetime.fromisoformat(end_ts.replace("Z", "+00:00"))
             
-            # Distance
             distance_meters = segment.get("distance", 0)
             distance_km = float(distance_meters) / 1000.0 if distance_meters else None
             
-            # Geocode if coordinates exist
             s_addr = None
             e_addr = None
             if start_lat and start_lng:
@@ -267,7 +238,6 @@ async def import_timeline(
     
     return {"status": "success", "imported": imported_count}
 
-
 @router.delete("/{trip_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_trip(
     trip_id: str,
@@ -287,7 +257,6 @@ async def delete_trip(
     await db.commit()
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_all_trips(

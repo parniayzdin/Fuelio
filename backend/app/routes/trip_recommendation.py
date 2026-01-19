@@ -15,12 +15,9 @@ from ..vector_store import OptimizationVectorStore
 
 router = APIRouter()
 
-# Configure Gemini
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-# Initialize vector store
 vector_store = OptimizationVectorStore()
-
 
 @router.get("/trip-recommendation")
 async def get_trip_recommendation(
@@ -29,7 +26,6 @@ async def get_trip_recommendation(
 ):
     """Get AI-powered fuel recommendation based on CPLEX optimization + Gemini RAG."""
     
-    # Fetch future trips
     now = datetime.utcnow()
     result = await db.execute(
         select(Trip)
@@ -48,7 +44,6 @@ async def get_trip_recommendation(
             "confidence": "N/A"
         }
     
-    # Get vehicle data
     vehicle_result = await db.execute(
         select(Vehicle).where(Vehicle.user_id == current_user.id)
     )
@@ -63,7 +58,6 @@ async def get_trip_recommendation(
             "confidence": "N/A"
         }
     
-    # Prepare trips for optimization
     trips_data = [
         {
             'distance_km': trip.distance_km or 0,
@@ -72,17 +66,14 @@ async def get_trip_recommendation(
         for trip in upcoming_trips
     ]
     
-    # Mock stations (in production, fetch from real stations along route)
     stations = [
         {'price': 1.45, 'location': 'Station A'},
         {'price': 1.50, 'location': 'Station B'},
         {'price': 1.48, 'location': 'Station C'},
     ]
     
-    # Estimate current fuel level (mock - would come from user input or sensor)
-    current_fuel = vehicle.tank_size_liters * 0.5  # Assume 50%
+    current_fuel = vehicle.tank_size_liters * 0.5
     
-    # Run CPLEX optimization
     optimization_result = optimize_fuel_purchases(
         trips=trips_data,
         stations=stations,
@@ -92,7 +83,6 @@ async def get_trip_recommendation(
         reserve_fraction=vehicle.reserve_fraction
     )
     
-    # Store in vector DB
     opt_id = str(uuid.uuid4())
     context = {
         'timestamp': now.isoformat(),
@@ -101,17 +91,14 @@ async def get_trip_recommendation(
     }
     vector_store.store_optimization(opt_id, optimization_result, context)
     
-    # Retrieve similar past optimizations for RAG
     query = f"Optimization with {len(trips_data)} trips, status {optimization_result.get('status')}"
     similar_opts = vector_store.retrieve_similar(query, n_results=2)
     
-    # Build RAG context
     rag_context = "\n\n".join([
         f"Past Optimization {i+1}:\n{opt['document']}"
         for i, opt in enumerate(similar_opts)
     ])
     
-    # Use Gemini RAG to interpret CPLEX results
     model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = f"""You are an expert fuel advisor analyzing CPLEX optimization results.
@@ -142,7 +129,6 @@ CONFIDENCE: [HIGH/MEDIUM/LOW]"""
         response = model.generate_content(prompt)
         ai_response = response.text
         
-        # Parse response
         lines = ai_response.strip().split('\n')
         recommendation = "FILL_NOW"
         reasoning = "Recommended by optimization model."
@@ -178,7 +164,6 @@ CONFIDENCE: [HIGH/MEDIUM/LOW]"""
         }
         
     except Exception as e:
-        # Fallback if Gemini fails
         next_trip = upcoming_trips[0]
         return {
             "recommendation": "FILL_BEFORE_TRIP",

@@ -9,7 +9,6 @@ from ..auth import get_current_user
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
-
 @router.get("", response_model=list[AlertResponse])
 async def get_alerts(
     current_user: User = Depends(get_current_user),

@@ -18,15 +18,12 @@ from pyomo.environ import (
     Binary, NonNegativeReals, minimize, SolverFactory, value
 )
 
-
-
 @dataclass
 class TripPoint:
     """A point along the trip route."""
     lat: float
     lng: float
     km_from_start: float = 0.0
-
 
 @dataclass
 class GasStationData:
@@ -37,8 +34,8 @@ class GasStationData:
     lat: float
     lng: float
     address: str
-    km_along_route: float  # Distance along route where this station is closest
-    base_prices: dict  # {day_offset: price} for next 7 days
+    km_along_route: float
+    base_prices: dict
     best_card: Optional[str] = None
     cashback_percent: float = 0.0
     
@@ -46,7 +43,6 @@ class GasStationData:
         """Get effective price after cashback for a given day."""
         base = self.base_prices.get(day_offset, self.base_prices.get(0, 1.50))
         return base * (1 - self.cashback_percent / 100.0)
-
 
 @dataclass  
 class FillUpStop:
@@ -61,8 +57,7 @@ class FillUpStop:
     fuel_level_after: float
     km_at_stop: float
     savings_from_card: float
-    savings_from_timing: float  # Savings from waiting for better price
-
+    savings_from_timing: float
 
 @dataclass
 class OptimizationResult:
@@ -71,9 +66,8 @@ class OptimizationResult:
     total_cost: float
     total_savings: float
     reasoning: list[str]
-    fuel_projection: list[dict]  # [{km, fuel_pct, action}]
+    fuel_projection: list[dict]
     solver_status: str
-
 
 def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     """Calculate distance between two points in km."""
@@ -84,31 +78,25 @@ def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     a = math.sin(dlat/2)**2 + math.cos(lat1_rad)*math.cos(lat2_rad)*math.sin(dlng/2)**2
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
 
-
 def point_to_segment_distance(point: tuple, seg_start: tuple, seg_end: tuple) -> float:
     """Calculate perpendicular distance from point to line segment in km."""
     px, py = point
     ax, ay = seg_start
     bx, by = seg_end
     
-    # Vector from A to B
     abx, aby = bx - ax, by - ay
-    # Vector from A to P
     apx, apy = px - ax, py - ay
     
     ab_sq = abx*abx + aby*aby
     if ab_sq == 0:
         return haversine_km(px, py, ax, ay)
     
-    # Project P onto AB, clamped to [0,1]
     t = max(0, min(1, (apx*abx + apy*aby) / ab_sq))
     
-    # Closest point on segment
     closest_x = ax + t * abx
     closest_y = ay + t * aby
     
     return haversine_km(px, py, closest_x, closest_y)
-
 
 def find_stations_along_route(
     route_points: list[TripPoint],
@@ -160,7 +148,6 @@ def find_stations_along_route(
     found_stations.sort(key=lambda s: s.km_along_route)
     return found_stations
 
-
 def apply_card_benefits(stations: list[GasStationData], user_cards: list[dict]) -> None:
     """Apply credit card cashback rates to stations."""
     for station in stations:
@@ -176,20 +163,16 @@ def apply_card_benefits(stations: list[GasStationData], user_cards: list[dict]) 
         station.cashback_percent = best_cashback
         station.best_card = best_card
 
-
 def add_price_forecasts(stations: list[GasStationData], forecast_days: int = 7) -> None:
     """Add 7-day price forecasts to each station."""
     from ..domain.forecast import generate_forecast
     
     for station in stations:
         today_price = station.base_prices.get(0, 1.50)
-        # Generate simple forecast based on today's price
-        # In production, use historical data per station
         forecasts = generate_forecast(today_price, [today_price] * 7, days=forecast_days)
         
         for i, fc in enumerate(forecasts):
             station.base_prices[i + 1] = fc['predicted_price']
-
 
 def build_optimization_model(
     stations: list[GasStationData],
@@ -290,7 +273,6 @@ def build_optimization_model(
     
     return model, metadata
 
-
 def solve_greedy_heuristic(metadata: dict) -> OptimizationResult:
     """
     Fallback heuristic when no solver is available.
@@ -376,13 +358,8 @@ def solve_greedy_heuristic(metadata: dict) -> OptimizationResult:
         solver_status="heuristic_optimal"
     )
 
-
-
-
 def solve_model(model: ConcreteModel) -> str:
     """Solve the optimization model. Returns solver status."""
-    # Try solvers in order of preference
-    # Removed glpk/cbc mandatory check to fall through to heuristic if missing
     solvers = ['cplex', 'cbc', 'glpk', 'appsi_highs']
     
     for solver_name in solvers:
@@ -397,8 +374,6 @@ def solve_model(model: ConcreteModel) -> str:
     
     return "solver_not_found"
 
-
-
 def extract_solution(model: ConcreteModel, metadata: dict) -> OptimizationResult:
     """Extract solution from solved model."""
     stations = metadata['stations']
@@ -408,19 +383,17 @@ def extract_solution(model: ConcreteModel, metadata: dict) -> OptimizationResult
     total_cost = 0.0
     total_savings = 0.0
     
-    # Find active fill-ups
     for s in model.STATIONS:
         for d in model.DAYS:
-            if value(model.x[s,d]) > 0.5:  # Binary is 1
+            if value(model.x[s,d]) > 0.5:
                 liters = value(model.liters[s,d])
-                if liters > 0.1:  # Meaningful fill
+                if liters > 0.1:
                     station = stations[s]
                     eff_price = station.effective_price(d)
                     base_price = station.base_prices.get(d, station.base_prices.get(0, 1.50))
                     
                     card_savings = liters * base_price * (station.cashback_percent / 100.0)
                     
-                    # Calculate timing savings (vs filling today)
                     today_price = station.effective_price(0)
                     timing_savings = (today_price - eff_price) * liters if today_price > eff_price else 0
                     
@@ -431,7 +404,7 @@ def extract_solution(model: ConcreteModel, metadata: dict) -> OptimizationResult
                         effective_price=round(eff_price, 3),
                         base_price=round(base_price, 3),
                         card_to_use=station.best_card,
-                        fuel_level_before=0,  # Calculated below
+                        fuel_level_before=0,
                         fuel_level_after=0,
                         km_at_stop=station.km_along_route,
                         savings_from_card=round(card_savings, 2),
@@ -441,7 +414,6 @@ def extract_solution(model: ConcreteModel, metadata: dict) -> OptimizationResult
                     total_cost += liters * eff_price
                     total_savings += card_savings + timing_savings
                     
-                    # Generate reasoning
                     if d == 0:
                         reasoning.append(
                             f"Fill {liters:.1f}L at {station.name} today at ${eff_price:.3f}/L"
@@ -462,10 +434,8 @@ def extract_solution(model: ConcreteModel, metadata: dict) -> OptimizationResult
     if not stops:
         reasoning.append("No fill-up needed - you have enough fuel for the trip!")
     
-    # Sort stops by km position
     stops.sort(key=lambda s: s.km_at_stop)
     
-    # Build fuel projection
     fuel_projection = build_fuel_projection(
         stops, metadata['route_points'], 
         metadata['initial_fuel'], metadata['tank_size'],
@@ -481,7 +451,6 @@ def extract_solution(model: ConcreteModel, metadata: dict) -> OptimizationResult
         solver_status="optimal"
     )
 
-
 def build_fuel_projection(
     stops: list[FillUpStop],
     route_points: list[TripPoint],
@@ -493,7 +462,6 @@ def build_fuel_projection(
     projection = []
     current_fuel = initial_fuel
     
-    # Calculate total km  
     total_km = 0
     for i in range(len(route_points) - 1):
         total_km += haversine_km(
@@ -501,7 +469,6 @@ def build_fuel_projection(
             route_points[i+1].lat, route_points[i+1].lng
         )
     
-    # Sample points every 10km
     sample_points = list(range(0, int(total_km) + 1, 10))
     if total_km not in sample_points:
         sample_points.append(int(total_km))
@@ -510,15 +477,13 @@ def build_fuel_projection(
     
     prev_km = 0
     for km in sample_points:
-        # Fuel consumed since last point
         consumed = ((km - prev_km) * efficiency) / 100.0
         current_fuel -= consumed
         
         action = None
         
-        # Check if there's a fill-up near this point
         for stop_km, stop in stop_kms.items():
-            if abs(km - stop_km) < 5:  # Within 5km
+            if abs(km - stop_km) < 5:
                 current_fuel += stop.liters_to_fill
                 current_fuel = min(current_fuel, tank_size)
                 action = f"FILL {stop.liters_to_fill:.0f}L at {stop.station.name}"
@@ -534,10 +499,6 @@ def build_fuel_projection(
         prev_km = km
     
     return projection
-
-
-
-
 
 def explain_strategy_with_llm(result: OptimizationResult, initial_context: dict) -> list[str]:
     """Use Gemini to explain the greedy strategy in a helpful way."""
@@ -578,7 +539,6 @@ def explain_strategy_with_llm(result: OptimizationResult, initial_context: dict)
     except Exception as e:
         print(f"LLM generation failed: {e}")
         return result.reasoning  # Fallback to existing reasoning
-
 
 async def optimize_fuel_strategy(
     route_points: list[dict],
@@ -686,8 +646,4 @@ async def optimize_fuel_strategy(
             result.reasoning = llm_explanation
         
     return result
-
-
-
-
 
