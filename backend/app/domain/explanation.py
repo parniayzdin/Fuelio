@@ -55,7 +55,7 @@ def generate_explanation(
         else:
             parts.append("You may want to fill up, but it's not urgent.")
 
-    else:  # NO_ACTION
+    else:
         parts.append(f"You have approximately {range_km:.0f} km of range remaining.")
 
         if price_trend == "falling" and price_delta:

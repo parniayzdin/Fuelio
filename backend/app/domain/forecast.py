@@ -38,31 +38,23 @@ def generate_forecast(
     if not historical_prices:
         return []
 
-    # Prepare data for regression
-    # historical_prices is [today, yesterday, 2days_ago...]
-    # We want chronological: [oldest...newest]
     y = np.array(historical_prices[::-1])
     n_samples = len(y)
     
-    # X axis is days [0, 1, ... n-1]
     X = np.arange(n_samples).reshape(-1, 1)
 
-    # Train model
     model = LinearRegression()
     model.fit(X, y)
 
     forecasts = []
     base_date = date.today()
 
-    # Predict for next 'days' days
-    # If we have N sample (0..N-1), next day is N
     future_X = np.arange(n_samples, n_samples + days).reshape(-1, 1)
     predictions = model.predict(future_X)
 
     for i, predicted_price in enumerate(predictions, 1):
         forecast_date = base_date + timedelta(days=i)
         
-        # Ensure we don't return negative prices (though unlikely with stable fuel data)
         predicted_price = max(0.01, predicted_price)
 
         delta = predicted_price - today_price

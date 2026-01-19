@@ -202,4 +202,3 @@ async def get_me_root(current_user: User = Depends(get_current_user)):
         "email": current_user.email,
         "tos_accepted_at": current_user.tos_accepted_at
     }
-

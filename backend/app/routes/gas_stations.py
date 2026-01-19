@@ -14,10 +14,8 @@ from sqlalchemy import select, and_
 
 router = APIRouter(prefix="/gas-stations", tags=["gas-stations"])
 
-# Get Google Maps API key from environment
 GOOGLE_MAPS_API_KEY = os.getenv("VITE_GOOGLE_MAPS_API_KEY") or os.getenv("GOOGLE_MAPS_API_KEY")
 
-# Initialize Google Maps client
 gmaps = None
 if GOOGLE_MAPS_API_KEY:
     try:
@@ -73,7 +71,6 @@ async def get_station_prices(lat: float, lng: float, station_name: str = "") -> 
         except Exception as e:
             print(f"⚠️ Failed to init FuelService: {e}")
 
-    # Default fallback prices
     prices = {
         "regular": 1.45,
         "premium": 1.65,
@@ -81,21 +78,13 @@ async def get_station_prices(lat: float, lng: float, station_name: str = "") -> 
     }
 
     try:
-        # 1. Try to find specific station (radius ~1km = 0.6 miles)
-        # pyfuelprices uses miles? The service wrapper might handle it.
-        # Looking at FuelService._get_regional_average it passes radius directly.
-        # Let's assume broad search first.
         found_stations = fuel_service.fuel_client.find_fuel_stations_from_point((lat, lng), 1.0)
         
         target_station = None
         if found_stations:
-            # Simple heuristic: closest distance is likely the one
-            # pyfuelprices stations usually have lat/lng
-            # For now, just take the first one found in tight radius
             target_station = found_stations[0]
             
         if target_station:
-            # Extract prices
             for fuel in target_station.available_fuels:
                 ftype = fuel.fuel_type.lower()
                 if ftype in ["regular", "unleaded", "gasoline"] and fuel.cost > 0:
@@ -105,7 +94,6 @@ async def get_station_prices(lat: float, lng: float, station_name: str = "") -> 
                 elif ftype in ["diesel"] and fuel.cost > 0:
                     prices["diesel"] = fuel.cost
                     
-            # Auto-calculate gaps if missing
             if prices["premium"] == 1.65 and prices["regular"] != 1.45:
                  prices["premium"] = round(prices["regular"] + 0.20, 2)
             if prices["diesel"] == 1.55 and prices["regular"] != 1.45:
@@ -113,12 +101,6 @@ async def get_station_prices(lat: float, lng: float, station_name: str = "") -> 
                  
             return prices
 
-        # 2. Fallback: Regional Average
-        # We can use the service's finding logic to just get ANY stats
-        # Or use hardcoded coordinates for known regions
-        
-        # Determine closest major region
-        # (Simple distance check to known hubs)
         hubs = {
             "toronto": (43.65, -79.38),
             "ottawa": (45.42, -75.69),
@@ -146,8 +128,6 @@ async def get_station_prices(lat: float, lng: float, station_name: str = "") -> 
 
     return prices
 
-# ... (imports overhead)
-
 @router.get("/nearby", response_model=list[GasStation])
 async def get_nearby_gas_stations(
     lat: float = Query(..., description="Latitude of the center point"),
@@ -173,12 +153,8 @@ async def get_nearby_gas_stations(
         )
     
     try:
-        # Use Places API Nearby Search to find gas stations
-        # Type 'gas_station' returns actual gas stations
-        # Google Places API returns up to 20 results per page, max 60 results total (3 pages)
 
-        # 1. Fetch existing stations from DB for this area (rectangular bounds approximation)
-        degree_offset = (radius / 111000.0) * 1.5 # 1.5x buffer for DB query
+        degree_offset = (radius / 111000.0) * 1.5
         
         db_stations = []
         try:
@@ -196,7 +172,6 @@ async def get_nearby_gas_stations(
         except Exception as e:
             print(f"⚠️ Warning: DB Cache read failed: {e}")
 
-        # Convert DB models to Pydantic
         stations_map = {}
         for s in db_stations:
             stations_map[s.place_id] = GasStation(
@@ -215,10 +190,8 @@ async def get_nearby_gas_stations(
                 user_ratings_total=int(s.user_ratings_total) if s.user_ratings_total else None
             )
 
-        # 2. Fetch new data from Google Places (Grid Search)
         if gmaps:
             try:
-                # Helper function to fetch a single page of results
                 def fetch_places(location, radius, page_token=None):
                     try:
                         places_result = gmaps.places_nearby(
@@ -234,7 +207,6 @@ async def get_nearby_gas_stations(
 
                 raw_results = []
                 
-                # STRATEGY: Small vs Large Radius Grid Search
                 if radius <= 5000:
                     next_page_token = None
                     for _ in range(3):
@@ -244,51 +216,40 @@ async def get_nearby_gas_stations(
                         import time
                         time.sleep(2)
                 else:
-                    # Large radius: Sector Search (Grid)
                     offset_deg = (radius * 0.5) / 111000 
                     sectors = [
-                        ((lat, lng), radius * 0.6),            # Center
-                        ((lat + offset_deg, lng), radius * 0.6), # North
-                        ((lat - offset_deg, lng), radius * 0.6), # South
-                        ((lat, lng + offset_deg), radius * 0.6), # East
-                        ((lat, lng - offset_deg), radius * 0.6), # West
+                        ((lat, lng), radius * 0.6),
+                        ((lat + offset_deg, lng), radius * 0.6),
+                        ((lat - offset_deg, lng), radius * 0.6),
+                        ((lat, lng + offset_deg), radius * 0.6),
+                        ((lat, lng - offset_deg), radius * 0.6),
                     ]
                     print(f"🌍 Performing Sector Search with {len(sectors)} sectors")
                     for loc, sec_radius in sectors:
                         results, _ = fetch_places(loc, sec_radius)
                         raw_results.extend(results)
 
-                # 3. Process and Upsert to DB
                 new_stations_count = 0
                 for place in raw_results:
                     place_id = place.get('place_id')
                     if not place_id: continue
                     
-                    # Extract location
                     location = place.get('geometry', {}).get('location', {})
                     place_lat = location.get('lat')
                     place_lng = location.get('lng')
                     if not place_lat or not place_lng: continue
                     
-                    # Metadata
                     name = place.get('name', 'Gas Station')
                     address = place.get('vicinity', '')
                     rating = place.get('rating')
-                    # Handle user_ratings_total carefully
                     user_ratings_total = place.get('user_ratings_total')
-                    # Ensure it's not None if possible or leave it Optional
                     
                     brand = extract_brand_from_name(name)
                     prices = await get_station_prices(place_lat, place_lng, name)
                     
-                    # Create/Update DB Model
-                    # Check if exists in DB (optimization: check our map first)
-                    if place_id not in stations_map: # New station or update logic could go here
+                    if place_id not in stations_map:
                         new_stations_count += 1
                         
-                    # Upsert to DB
-                    # Note: In a real app we might only update if data changed or is old
-                    # For now, we will update the DB record to ensure freshness
                     db_station = await db.get(GasStationModel, place_id)
                     if not db_station:
                         db_station = GasStationModel(place_id=place_id)
@@ -306,7 +267,6 @@ async def get_nearby_gas_stations(
                     db_station.user_ratings_total = user_ratings_total
                     db_station.last_updated = datetime.utcnow()
                     
-                    # Update our response map
                     stations_map[place_id] = GasStation(
                         id=place_id,
                         name=name,
@@ -333,7 +293,6 @@ async def get_nearby_gas_stations(
             except Exception as e:
                 print(f"Error in Google Maps fetch flow: {e}")
 
-        # Return values from map as list
         final_list = list(stations_map.values())
         final_list.sort(key=lambda s: s.regular if s.regular else 999)
         return final_list
@@ -422,19 +381,16 @@ async def get_optimal_gas_station(
     from ..models import CreditCard as CreditCardModel
     import json
     
-    # Get all credit cards in the DB (simplified - gets all cards)
     user_cards = []
     user_card_names = []
     try:
         result = await db.execute(select(CreditCardModel))
         all_cards = result.scalars().all()
-        # For now, just use all cards in the DB (in production, filter by user)
         user_cards = all_cards
         user_card_names = [c.provider for c in user_cards]
     except Exception as e:
         print(f"Could not get user cards: {e}")
     
-    # Parse card benefits
     def parse_benefits(card):
         if not card.benefits_json:
             return {"gas_cashback_percent": 0, "partner_stations": []}
@@ -452,17 +408,14 @@ async def get_optimal_gas_station(
             "partners": benefits.get("partner_stations") or []
         })
     
-    # Get nearby stations
     nearby_stations_result = await get_nearby_gas_stations(lat, lng, radius, db)
     
     if not nearby_stations_result:
         raise HTTPException(status_code=404, detail="No gas stations found")
     
-    # Calculate liters to fill
     current_liters = tank_size_liters * (current_fuel_percent / 100.0)
     liters_to_fill = tank_size_liters - current_liters
     
-    # Known good gas cards for recommendations
     RECOMMENDED_CARDS = [
         {"name": "Citi Custom Cash Card", "cashback": 5.0, "notes": "5% on top spending category"},
         {"name": "Sam's Club Mastercard", "cashback": 5.0, "notes": "5% on gas (first $6k/yr)"},
@@ -471,7 +424,6 @@ async def get_optimal_gas_station(
         {"name": "Blue Cash Preferred Amex", "cashback": 3.0, "notes": "3% at US gas stations"},
     ]
     
-    # Analyze each station with credit card benefits
     station_analyses = []
     
     for station in nearby_stations_result:
@@ -482,7 +434,6 @@ async def get_optimal_gas_station(
         distance_km = haversine_distance(lat, lng, station.lat, station.lng)
         fuel_to_drive = (distance_km * efficiency_l_per_100km) / 100.0
         
-        # Find best card for this station
         best_card = None
         best_cashback = 0
         
@@ -492,11 +443,9 @@ async def get_optimal_gas_station(
                 best_cashback = cashback
                 best_card = card["provider"]
         
-        # Calculate effective price after cashback
         cashback_discount = base_price * (best_cashback / 100.0)
         effective_price = base_price - cashback_discount
         
-        # Costs
         fuel_cost_to_drive = fuel_to_drive * effective_price
         fill_cost = liters_to_fill * effective_price
         total_cost = fill_cost + fuel_cost_to_drive
@@ -518,13 +467,10 @@ async def get_optimal_gas_station(
     if not station_analyses:
         raise HTTPException(status_code=404, detail="No stations with price data")
     
-    # Sort by total cost (after cashback!)
     station_analyses.sort(key=lambda x: x["total_cost"])
     
-    # Calculate averages
     avg_total_cost = sum(s["total_cost"] for s in station_analyses) / len(station_analyses)
     
-    # Create recommendations
     recommendations = []
     
     for i, analysis in enumerate(station_analyses[:5]):
@@ -557,15 +503,13 @@ async def get_optimal_gas_station(
             card_savings=analysis["card_savings"]
         ))
     
-    # Generate card recommendations
     card_recommendations = []
     user_card_lower = [n.lower() for n in user_card_names]
     
     for rec_card in RECOMMENDED_CARDS:
         if any(rec_card["name"].lower() in uc for uc in user_card_lower):
-            continue  # Skip if user has this card
+            continue
         
-        # Calculate potential savings with this card
         best_total = float('inf')
         best_station_name = ""
         best_eff_price = 0
@@ -583,7 +527,7 @@ async def get_optimal_gas_station(
         current_best = recommendations[0].total_cost_for_tank if recommendations else float('inf')
         potential_savings = current_best - best_total
         
-        if potential_savings > 0.5:  # Recommend if saves at least $0.50
+        if potential_savings > 0.5:
             card_recommendations.append(CardRecommendation(
                 card_name=rec_card["name"],
                 potential_savings_per_fill=round(potential_savings, 2),
@@ -594,7 +538,6 @@ async def get_optimal_gas_station(
     
     card_recommendations.sort(key=lambda x: x.potential_savings_per_fill, reverse=True)
     
-    # Create summary
     optimal = recommendations[0]
     summary_parts = [f"Analyzed {len(station_analyses)} stations."]
     

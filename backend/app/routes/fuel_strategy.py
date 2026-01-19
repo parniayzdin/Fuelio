@@ -88,7 +88,6 @@ async def optimize_trip_fuel_strategy(
             detail="Trip path must have at least 2 points (start and end)"
         )
     
-    # Get all gas stations from DB
     try:
         result = await db.execute(select(GasStationModel))
         db_stations = result.scalars().all()
@@ -96,7 +95,6 @@ async def optimize_trip_fuel_strategy(
         print(f"Error fetching stations: {e}")
         db_stations = []
     
-    # Convert to dict format
     all_stations = []
     for s in db_stations:
         all_stations.append({
@@ -109,7 +107,6 @@ async def optimize_trip_fuel_strategy(
             'regular': s.regular
         })
     
-    # Get user's credit cards
     try:
         result = await db.execute(select(CreditCardModel))
         db_cards = result.scalars().all()
@@ -117,7 +114,6 @@ async def optimize_trip_fuel_strategy(
         print(f"Error fetching cards: {e}")
         db_cards = []
     
-    # Parse card benefits
     user_cards = []
     for card in db_cards:
         benefits = {}
@@ -131,10 +127,8 @@ async def optimize_trip_fuel_strategy(
             'cashback': benefits.get('gas_cashback_percent', 0)
         })
     
-    # Convert trip path
     route_points = [{'lat': p.lat, 'lng': p.lng} for p in request.trip_path]
     
-    # Calculate trip distance
     from ..services.fuel_strategy_optimizer import haversine_km
     trip_distance = sum(
         haversine_km(
@@ -144,7 +138,6 @@ async def optimize_trip_fuel_strategy(
         for i in range(len(route_points) - 1)
     )
     
-    # Run optimization
     result = await optimize_fuel_strategy(
         route_points=route_points,
         all_stations=all_stations,
@@ -156,7 +149,6 @@ async def optimize_trip_fuel_strategy(
         forecast_days=7
     )
     
-    # Convert to response format
     from datetime import date, timedelta
     
     stops = []

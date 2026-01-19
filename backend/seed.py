@@ -12,11 +12,9 @@ from backend.app.db import async_session, engine, Base
 from backend.app.models import User, Vehicle, Trip, Fillup, Region, Price
 from backend.app.auth import hash_password
 
-# Demo user credentials
 DEMO_EMAIL = "demo@example.com"
 DEMO_PASSWORD = "demo1234"
 
-# Canadian regions (Cities)
 REGIONS = [
     ("toronto", "Toronto"),
     ("ottawa", "Ottawa"),
@@ -27,7 +25,6 @@ REGIONS = [
     ("sudbury", "Sudbury"),
 ]
 
-# Base prices per region (CAD/liter)
 BASE_PRICES = {
     "toronto": 1.42,
     "ottawa": 1.45,
@@ -46,7 +43,7 @@ async def seed_regions(db: AsyncSession):
             region = Region(id=region_id, name=name)
             db.add(region)
     await db.commit()
-    print("✓ Regions seeded")
+    print("Regions seeded")
 
 async def seed_prices(db: AsyncSession, days: int = 60):
     """Generate synthetic price data for last N days."""
@@ -78,7 +75,7 @@ async def seed_prices(db: AsyncSession, days: int = 60):
             db.add(price)
 
     await db.commit()
-    print(f"✓ Prices seeded ({days} days for {len(REGIONS)} regions)")
+    print(f"Prices seeded ({days} days for {len(REGIONS)} regions)")
 
 async def seed_demo_user(db: AsyncSession):
     """Create demo user with vehicle, trips, and fillup."""
@@ -92,9 +89,9 @@ async def seed_demo_user(db: AsyncSession):
         )
         db.add(user)
         await db.flush()
-        print(f"✓ Demo user created: {DEMO_EMAIL} / {DEMO_PASSWORD}")
+        print(f"Demo user created: {DEMO_EMAIL} / {DEMO_PASSWORD}")
     else:
-        print(f"✓ Demo user exists: {DEMO_EMAIL}")
+        print(f"Demo user exists: {DEMO_EMAIL}")
 
     result = await db.execute(select(Vehicle).where(Vehicle.user_id == user.id))
     if not result.scalar_one_or_none():
@@ -106,7 +103,7 @@ async def seed_demo_user(db: AsyncSession):
             default_region_id="ontario",
         )
         db.add(vehicle)
-        print("✓ Demo vehicle created")
+        print("Demo vehicle created")
 
     existing_trips = await db.execute(select(Trip).where(Trip.user_id == user.id))
     if not existing_trips.scalars().first():
@@ -124,7 +121,7 @@ async def seed_demo_user(db: AsyncSession):
                 distance_km=round(distance, 1),
             )
             db.add(trip)
-        print("✓ Demo trips created")
+        print("Demo trips created")
 
     existing_fillups = await db.execute(select(Fillup).where(Fillup.user_id == user.id))
     if not existing_fillups.scalars().first():
@@ -135,12 +132,12 @@ async def seed_demo_user(db: AsyncSession):
             liters_optional=45.0,
         )
         db.add(fillup)
-        print("✓ Demo fillup created")
+        print("Demo fillup created")
 
     await db.commit()
 
 async def main():
-    print("🌱 Seeding database...")
+    print("Seeding database...")
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -150,7 +147,7 @@ async def main():
         await seed_prices(db)
         await seed_demo_user(db)
 
-    print("✅ Seeding complete!")
+    print("Seeding complete!")
 
 if __name__ == "__main__":
     asyncio.run(main())

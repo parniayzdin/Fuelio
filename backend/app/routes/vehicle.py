@@ -207,4 +207,3 @@ async def update_vehicle(
         image_url=vehicle.image_url,
         fuel_type=vehicle.fuel_type,
     )
-
