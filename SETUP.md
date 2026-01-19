@@ -1,9 +1,7 @@
-# Fuel Up Advisor - Setup Guide
+# Fuel Up Advisor
+Smart fuel decisions based on price trends.
 
-Smart fuel decisions based on price trends and your driving patterns.
-
-## Quick Start
-
+## Initialization
 ### Option 1: Run Everything (Recommended)
 ```bash
 ./start.sh
@@ -82,7 +80,6 @@ fuel-up-advisor/
 ---
 
 ## Bash Scripts
-
 | Script | Purpose |
 |--------|---------|
 | `./start.sh` | Start both backend + frontend together |
@@ -92,7 +89,6 @@ fuel-up-advisor/
 ---
 
 ## Manual Setup
-
 ### Backend
 ```bash
 # Create virtual environment
@@ -118,7 +114,6 @@ npm run dev
 ---
 
 ## Environment Variables
-
 ### Backend (.env)
 ```bash
 DATABASE_URL=sqlite+aiosqlite:///./backend/fuelup.db  # SQLite (default)
@@ -152,7 +147,6 @@ docker compose up --build backend
 ---
 
 ## Running Tests
-
 ```bash
 # Backend tests
 source venv/bin/activate
@@ -163,7 +157,6 @@ pytest backend/tests/
 ---
 
 ## Tech Stack
-
 | Layer | Technology |
 |-------|------------|
 | Frontend | React, TypeScript, Vite, Tailwind CSS, shadcn/ui |
