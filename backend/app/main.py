@@ -9,14 +9,7 @@ from .routes.trips import router as trips_router
 from .routes.fillups import router as fillups_router
 from .routes.prices import router as prices_router
 from .routes.decision import router as decision_router
-from .routes.ai import router as ai_router
-from .routes.alerts import router as alerts_router
-from .routes.news_analysis import router as news_router
 from .routes.gas_stations import router as gas_stations_router
-from .routes.trip_recommendation import router as trip_recommendation_router
-from .routes.receipt_upload import router as receipt_router
-from .routes.credit_cards import router as credit_cards_router
-from .routes.fuel_strategy import router as fuel_strategy_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -25,7 +18,7 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(
-    title="Fuel Up Advisor API",
+    title="Fuelio API",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -45,14 +38,7 @@ app.include_router(trips_router)
 app.include_router(fillups_router)
 app.include_router(prices_router)
 app.include_router(decision_router)
-app.include_router(ai_router)
-app.include_router(alerts_router)
-app.include_router(news_router)
 app.include_router(gas_stations_router)
-app.include_router(trip_recommendation_router)
-app.include_router(receipt_router)
-app.include_router(credit_cards_router)
-app.include_router(fuel_strategy_router)
 
 @app.get("/health")
 async def health_check():

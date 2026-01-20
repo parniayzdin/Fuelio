@@ -19,12 +19,30 @@ Fuelio is a smart application designed to help drivers optimize their fuel spend
 
 
 ## Installation
+
+### Local Development
 ```bash
 docker compose up --build
 ```
 Then open http://localhost in your browser.
 
 **Demo credentials:** `demo@example.com` / `demo1234`
+
+### AWS Cloud Deployment
+Deploy to AWS cloud infrastructure for production use:
+
+```bash
+# See DEPLOYMENT.md for complete instructions
+./aws/deploy.sh
+```
+
+**Features:**
+- AWS ECS Fargate serverless containers
+- AWS RDS managed PostgreSQL database
+- Application Load Balancer for high availability
+- CloudWatch monitoring and logging
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed AWS deployment instructions.
 
 ## Quick Start (Local Development)
 ### Prerequisites

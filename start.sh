@@ -6,7 +6,6 @@ echo ""
 
 cd "$(dirname "$0")"
 
-#Load environment variables
 if [ -f ".env" ]; then
     export $(grep -v '^#' .env | xargs)
 fi
@@ -41,11 +40,6 @@ if [ ! -d "node_modules" ]; then
     npm install
 fi
 
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  Starting services..."
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
 uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 &
 BACKEND_PID=$!
 
@@ -54,11 +48,6 @@ sleep 2
 npm run dev -- --host &
 FRONTEND_PID=$!
 
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  Fuel Up Advisor is running!"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
 echo "  Frontend:  http://localhost:8080"
 echo "  Backend:   http://localhost:8000"
 echo "  API Docs:  http://localhost:8000/docs"
@@ -66,9 +55,5 @@ echo ""
 echo "  Demo Login:"
 echo "     Email:    demo@example.com"
 echo "     Password: demo1234"
-echo ""
-echo "  Press Ctrl+C to stop all services"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
 
 wait
