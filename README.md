@@ -5,7 +5,6 @@ Fuelio helps drivers make smarter fill-up decisions by combining live gas prices
 With fuel prices fluctuating wildly and the cost of living increasing, we realized that drivers needed smarter tools than just "current price" apps. We built this advisor to use data and AI to help people time their fill-ups perfectly and save money on every tank.
 
 ## Overview 
-Fuelio is a smart application designed to help drivers optimize their fuel spending. It analyzes real-time gas prices, tracks your driving history, and uses AI to recommend exactly when and where to fill up. It takes the stress out of finding cheap gas and ensures you never overpay at the pump.
 #### Frontend
 *   **React (Vite)**: Fast build tool and component-based UI.
 *   **TypeScript**: Type-safe code for reliability.
