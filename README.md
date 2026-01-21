@@ -12,14 +12,11 @@ Fuelio is a smart application designed to help drivers optimize their fuel spend
 *   **Tailwind CSS**: Utility-first styling for a premium, custom design.
 *   **Shadcn UI**: Accessible, re-usable component library.
 #### Backend
-*   **FastAPI**: High-performance, async Python web framework.
+*   **FastAPI**: Async Python web framework.
 *   **Uvicorn**: ASGI server implementation.
 *   **PyFuelPrices**: Custom library integration for real-time fuel data.
-[Watch the demo video](docs/demo.mp4)
-
 
 ## Installation
-
 ### Local Development
 ```bash
 docker compose up --build
@@ -32,10 +29,9 @@ Then open http://localhost in your browser.
 Deploy to AWS cloud infrastructure for production use:
 
 ```bash
-# See DEPLOYMENT.md for complete instructions
+#See DEPLOYMENT.md for complete instructions
 ./aws/deploy.sh
 ```
-
 **Features:**
 - AWS ECS Fargate serverless containers
 - AWS RDS managed PostgreSQL database
@@ -44,7 +40,7 @@ Deploy to AWS cloud infrastructure for production use:
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed AWS deployment instructions.
 
-## Quick Start (Local Development)
+## Initialization (Local Development)
 ### Prerequisites
 - Python 3.12+
 - Node.js 20+
@@ -52,21 +48,21 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed AWS deployment instructions.
 
 ### Backend
 ```bash
-# Create virtual environment
+#Create virtual environment
 python3 -m venv venv
 source venv/bin/activate
 
-# Install dependencies
+#Install dependencies
 pip install -r requirements.txt
 
-# Set environment variables
+#Set environment variables
 export DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/fuelup
 export SECRET_KEY=your-secret-key
 
-# Run the backend
+#Run the backend
 uvicorn backend.app.main:app --reload --port 8000
 
-# In another terminal, seed the database
+#In another terminal, seed the database
 python -m backend.seed
 ```
 
@@ -75,17 +71,5 @@ python -m backend.seed
 npm install
 npm run dev
 ```
-
 Open http://localhost:8080
 
-## Environment Variables
-### Backend
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | Postgres connection string | `postgresql+asyncpg://postgres:postgres@localhost:5432/fuelup` |
-| `SECRET_KEY` | JWT secret key | - |
-
-### Frontend
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VITE_API_BASE_URL` | Backend API URL | `http://localhost:8000` |
