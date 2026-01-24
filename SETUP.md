@@ -16,21 +16,18 @@ This starts both backend and frontend, seeds the database, and shows you the URL
 # Terminal 2 - Frontend  
 ./start-frontend.sh
 ```
----
+
 ## Demo Login
 - **Email:** demo@example.com
 - **Password:** demo1234
----
 
 ## URLs
-
 | Service | Local | Docker |
 |---------|-------|--------|
 | Frontend | http://localhost:8080 | http://localhost |
 | Backend | http://localhost:8000 | http://localhost:8000 |
 | API Docs | http://localhost:8000/docs | http://localhost:8000/docs |
 
----
 ## Prerequisites
 
 ### Local Development
@@ -41,7 +38,6 @@ This starts both backend and frontend, seeds the database, and shows you the URL
 ### Docker
 - Docker Desktop (includes Docker Compose)
 
----
 ## Bash Scripts
 | Script | Purpose |
 |--------|---------|
@@ -72,7 +68,7 @@ uvicorn backend.app.main: app --port 8000
 npm install
 npm run dev
 ```
----
+
 ## Environment Variables
 ### Backend (.env)
 ```bash
@@ -84,7 +80,7 @@ SECRET_KEY=your-secret-key
 ```bash
 VITE_API_BASE_URL=http://localhost:8000
 ```
----
+
 ## Docker Commands
 ```bash
 # Start all services
@@ -99,5 +95,3 @@ docker compose logs -f
 # Rebuild specific service
 docker compose up --build backend
 ```
-
-| Auth | JWT tokens |
