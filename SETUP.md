@@ -2,7 +2,7 @@
 Smart fuel decisions based on price trends.
 
 ## Initialization
-### Option 1: Run Everything (Recommended)
+### Option 1: Run Everything
 ```bash
 ./start.sh
 ```
@@ -78,14 +78,12 @@ fuel-up-advisor/
 ```
 
 ---
-
 ## Bash Scripts
 | Script | Purpose |
 |--------|---------|
 | `./start.sh` | Start both backend + frontend together |
 | `./start-backend.sh` | Start only the Python backend |
 | `./start-frontend.sh` | Start only the React frontend |
-
 ---
 
 ## Manual Setup
@@ -102,7 +100,7 @@ pip install -r requirements.txt
 python -m backend.seed
 
 # Run backend
-uvicorn backend.app.main:app --port 8000
+uvicorn backend.app.main: app --port 8000
 ```
 
 ### Frontend
@@ -110,9 +108,7 @@ uvicorn backend.app.main:app --port 8000
 npm install
 npm run dev
 ```
-
 ---
-
 ## Environment Variables
 ### Backend (.env)
 ```bash
@@ -120,16 +116,13 @@ DATABASE_URL=sqlite+aiosqlite:///./backend/fuelup.db  # SQLite (default)
 # DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/db  # Postgres
 SECRET_KEY=your-secret-key
 ```
-
 ### Frontend (.env)
 ```bash
 VITE_API_BASE_URL=http://localhost:8000
 ```
-
 ---
 
 ## Docker Commands
-
 ```bash
 # Start all services
 docker compose up --build
@@ -144,22 +137,4 @@ docker compose logs -f
 docker compose up --build backend
 ```
 
----
-
-## Running Tests
-```bash
-# Backend tests
-source venv/bin/activate
-pip install pytest
-pytest backend/tests/
-```
-
----
-
-## Tech Stack
-| Layer | Technology |
-|-------|------------|
-| Frontend | React, TypeScript, Vite, Tailwind CSS, shadcn/ui |
-| Backend | FastAPI, SQLAlchemy, Pydantic |
-| Database | SQLite (local) / PostgreSQL (Docker) |
 | Auth | JWT tokens |
