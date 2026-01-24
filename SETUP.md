@@ -16,18 +16,10 @@ This starts both backend and frontend, seeds the database, and shows you the URL
 # Terminal 2 - Frontend  
 ./start-frontend.sh
 ```
-
-### Option 3: Docker
-```bash
-docker compose up --build
-```
-
 ---
-
 ## Demo Login
 - **Email:** demo@example.com
 - **Password:** demo1234
-
 ---
 
 ## URLs
@@ -39,7 +31,6 @@ docker compose up --build
 | API Docs | http://localhost:8000/docs | http://localhost:8000/docs |
 
 ---
-
 ## Prerequisites
 
 ### Local Development
@@ -49,7 +40,6 @@ docker compose up --build
 
 ### Docker
 - Docker Desktop (includes Docker Compose)
----
 
 ---
 ## Bash Scripts
@@ -95,7 +85,6 @@ SECRET_KEY=your-secret-key
 VITE_API_BASE_URL=http://localhost:8000
 ```
 ---
-
 ## Docker Commands
 ```bash
 # Start all services
