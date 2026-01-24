@@ -49,33 +49,7 @@ docker compose up --build
 
 ### Docker
 - Docker Desktop (includes Docker Compose)
-
 ---
-
-## Project Structure
-
-```
-fuel-up-advisor/
-├── backend/
-│   ├── app/
-│   │   ├── main.py          # FastAPI application
-│   │   ├── db.py            # Database connection
-│   │   ├── models.py        # SQLAlchemy models
-│   │   ├── schemas.py       # Pydantic schemas
-│   │   ├── auth.py          # JWT authentication
-│   │   ├── domain/          # Business logic
-│   │   │   ├── decision.py  # Fill-up decision rules
-│   │   │   ├── forecast.py  # Price forecasting
-│   │   │   └── explanation.py
-│   │   └── routes/          # API endpoints
-│   ├── tests/               # Backend tests
-│   └── seed.py              # Demo data seeding
-├── src/                     # React frontend
-├── docker-compose.yml       # Docker orchestration
-├── start.sh                 # Start both services
-├── start-backend.sh         # Start backend only
-└── start-frontend.sh        # Start frontend only
-```
 
 ---
 ## Bash Scripts
