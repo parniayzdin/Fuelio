@@ -1,4 +1,4 @@
-# Fuelio
+# Fuelio (HackVille 2026)
 Fuelio helps drivers make smarter fill-up decisions by combining live gas prices with price trend forecasting and your driving patterns. It shows nearby stations on a map, estimates trip fuel costs for your vehicle, and gives clear recommendations on whether to fill up now or wait.
 
 ## Inspiration
