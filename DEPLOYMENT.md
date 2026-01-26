@@ -95,12 +95,3 @@ Check service status:
 aws ecs describe-services --cluster fuelio-cluster --services fuelio-service --region us-east-1
 ```
 
-## Delete Everything
-
-```bash
-aws cloudformation delete-stack --stack-name fuelio-infrastructure --region us-east-1
-```
-
-## Resume Bullet Point
-
-Deployed full-stack application to AWS cloud infrastructure using containerized architecture, leveraging Docker for container orchestration and cloud-native database services for scalable data management
