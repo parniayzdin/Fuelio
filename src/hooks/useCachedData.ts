@@ -7,22 +7,12 @@ interface CacheEntry<T> {
 
 interface UseCachedDataOptions {
     cacheKey: string;
-    ttlMs?: number; // Time to live in milliseconds, default 5 minutes
+    ttlMs?: number;
     staleWhileRevalidate?: boolean;
 }
 
 const cache = new Map<string, CacheEntry<any>>();
 
-/**
- * Custom hook for caching API data with optional stale-while-revalidate pattern
- * 
- * Usage:
- * const { data, isLoading, isStale, refresh } = useCachedData(
- *   'prices-toronto',
- *   () => fetchPrices('toronto'),
- *   { ttlMs: 60000 }
- * );
- */
 export function useCachedData<T>(
     cacheKey: string,
     fetcher: () => Promise<T>,
@@ -46,7 +36,6 @@ export function useCachedData<T>(
         const cached = cache.get(cacheKey);
         const now = Date.now();
 
-        // Return cached data if still fresh and not forcing refresh
         if (!force && cached && (now - cached.timestamp) < ttlMs) {
             setData(cached.data);
             setIsLoading(false);
@@ -54,7 +43,6 @@ export function useCachedData<T>(
             return cached.data;
         }
 
-        // Show stale data while fetching new data
         if (staleWhileRevalidate && cached) {
             setData(cached.data);
             setIsStale(true);
